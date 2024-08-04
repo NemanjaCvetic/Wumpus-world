@@ -1,0 +1,14 @@
+D:\Wumpus world\Wumpusworld\bin\Debug\net8.0\Wumpusworld.exe
+D:\Wumpus world\Wumpusworld\bin\Debug\net8.0\Wumpusworld.deps.json
+D:\Wumpus world\Wumpusworld\bin\Debug\net8.0\Wumpusworld.runtimeconfig.json
+D:\Wumpus world\Wumpusworld\bin\Debug\net8.0\Wumpusworld.dll
+D:\Wumpus world\Wumpusworld\bin\Debug\net8.0\Wumpusworld.pdb
+D:\Wumpus world\Wumpusworld\obj\Debug\net8.0\Wumpusworld.GeneratedMSBuildEditorConfig.editorconfig
+D:\Wumpus world\Wumpusworld\obj\Debug\net8.0\Wumpusworld.AssemblyInfoInputs.cache
+D:\Wumpus world\Wumpusworld\obj\Debug\net8.0\Wumpusworld.AssemblyInfo.cs
+D:\Wumpus world\Wumpusworld\obj\Debug\net8.0\Wumpusworld.csproj.CoreCompileInputs.cache
+D:\Wumpus world\Wumpusworld\obj\Debug\net8.0\Wumpusworld.dll
+D:\Wumpus world\Wumpusworld\obj\Debug\net8.0\refint\Wumpusworld.dll
+D:\Wumpus world\Wumpusworld\obj\Debug\net8.0\Wumpusworld.pdb
+D:\Wumpus world\Wumpusworld\obj\Debug\net8.0\Wumpusworld.genruntimeconfig.cache
+D:\Wumpus world\Wumpusworld\obj\Debug\net8.0\ref\Wumpusworld.dll

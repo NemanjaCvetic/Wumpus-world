@@ -12,3 +12,4 @@ D:\Wumpus world\Wumpusworld\obj\Debug\net8.0\refint\Wumpusworld.dll
 D:\Wumpus world\Wumpusworld\obj\Debug\net8.0\Wumpusworld.pdb
 D:\Wumpus world\Wumpusworld\obj\Debug\net8.0\Wumpusworld.genruntimeconfig.cache
 D:\Wumpus world\Wumpusworld\obj\Debug\net8.0\ref\Wumpusworld.dll
+D:\Wumpus world\Wumpusworld\obj\Debug\net8.0\Wumpusworld.sourcelink.json

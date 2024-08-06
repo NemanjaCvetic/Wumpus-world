@@ -129,7 +129,11 @@ internal class Program
 
         public List<string> GetCell(int x, int y)
         {
-            return world.ContainsKey((x, y)) ? world[(x, y)] : new List<string>();
+            if (world.TryGetValue((x, y), out var cellContents))
+        {
+            return new List<string>(cellContents);  // Return a copy of the list
+        }
+        return new List<string>();
         }
     }
 
@@ -139,6 +143,8 @@ internal class Program
     private KnowledgeBase kb;
     private List<(int, int)> visitedCells;
     private Direction facing;
+
+    private bool isAlive;
     private int score;
     private bool hasArrow;
     private List<string> actionLog;
@@ -149,6 +155,7 @@ internal class Program
         this.kb = new KnowledgeBase();
         this.visitedCells = new List<(int, int)>();
         this.facing = Direction.Right;
+         this.isAlive = true;
         this.score = 0;
         this.hasArrow = true;
         this.actionLog = new List<string>();
@@ -156,9 +163,14 @@ internal class Program
 
     public void Play()
     {
-        while (true)
+        while (isAlive)
         {
             PerceiveEnvironment();
+            if (!isAlive)
+            {
+                Log("Game Over: Agent died!");
+                break;
+            }
             if (world.AgentPosition == world.GoalPosition)
             {
                 Log($"Reached the goal! Final score: {score}");
@@ -172,7 +184,7 @@ internal class Program
 
     private void PerceiveEnvironment()
     {
-        var perceptions = world.GetCell(world.AgentPosition.Item1, world.AgentPosition.Item2);
+       var perceptions = world.GetCell(world.AgentPosition.Item1, world.AgentPosition.Item2);
         foreach (var perception in perceptions)
         {
             kb.Tell($"{perception}({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
@@ -182,6 +194,13 @@ internal class Program
             {
                 score += 1000;
                 Log("Gold picked up!");
+            }
+            else if (perception == "Pit" || perception == "Wumpus")
+            {
+                isAlive = false;
+                score -= 1000;  // Penalty for dying
+                Log($"Agent died! Stepped into a {perception}");
+                return;  // Stop perceiving if dead
             }
         }
     }
@@ -293,6 +312,18 @@ internal class Program
         score -= 1; // Cost of moving
         visitedCells.Add(nextPosition);
         Log($"Moved to {nextPosition}");
+
+        // Check if the new position has a pit or Wumpus
+        var dangers = world.GetCell(nextPosition.Item1, nextPosition.Item2)
+            .Where(p => p == "Pit" || p == "Wumpus")
+            .ToList();
+
+        if (dangers.Any())
+        {
+            isAlive = false;
+            score -= 1000;  // Penalty for dying
+            Log($"Agent died! Stepped into a {dangers.First()}");
+        }
     }
 
     private void UpdateFacing((int, int) nextPosition)

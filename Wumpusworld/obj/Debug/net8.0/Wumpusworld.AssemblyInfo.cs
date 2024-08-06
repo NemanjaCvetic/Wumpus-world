@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Wumpusworld")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e2fee8fa83eb4b61b48dd28834db9ef00061073c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0a8592ed5edcd3d423a6e558ce4fbd16dbc26d92")]
 [assembly: System.Reflection.AssemblyProductAttribute("Wumpusworld")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Wumpusworld")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

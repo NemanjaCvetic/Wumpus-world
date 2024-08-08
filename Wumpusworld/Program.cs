@@ -234,19 +234,51 @@ internal class Program
     }
 }
 
-     private void DeduceWumpusLocation()
+    private void DeduceWumpusLocation()
 {
-    for (int x = 1; x <= world.Width; x++)
+    // Check if the agent is on the edge of the world
+    if (world.AgentPosition.Item1 == 1 || world.AgentPosition.Item1 == world.Width ||
+        world.AgentPosition.Item2 == 1 || world.AgentPosition.Item2 == world.Height)
     {
-        for (int y = 1; y <= world.Height; y++)
+        // If the agent senses a Stench, the Wumpus must be in the adjacent cell in the direction of the edge
+        if (kb.Ask($"Stench({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
         {
-            if (kb.Ask($"Stench({x},{y})") && !kb.Ask($"Wumpus({x},{y})"))
+            (int, int) wumpusPosition = GetWumpusPositionFromStench(world.AgentPosition);
+            kb.Tell($"Wumpus({wumpusPosition.Item1},{wumpusPosition.Item2})");
+            Log($"Deduced that the Wumpus is on field ({wumpusPosition.Item1},{wumpusPosition.Item2})");
+        }
+    }
+    else
+    {
+        // For non-edge cells, use the previous deduction logic
+        for (int x = 1; x <= world.Width; x++)
+        {
+            for (int y = 1; y <= world.Height; y++)
             {
-                kb.Tell($"Wumpus({x},{y})");
-                Log($"Deduced that the Wumpus is on field ({x},{y})");
+                if (kb.Ask($"Stench({x},{y})") && !kb.Ask($"Wumpus({x},{y})"))
+                {
+                    kb.Tell($"Wumpus({x},{y})");
+                    Log($"Deduced that the Wumpus is on field ({x},{y})");
+                }
             }
         }
     }
+}
+
+private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
+{
+    if (kb.Ask($"Stench({agentPosition.Item1},{agentPosition.Item2})"))
+    {
+        if (agentPosition.Item1 == 1)
+            return (2, agentPosition.Item2);
+        else if (agentPosition.Item1 == world.Width)
+            return (world.Width - 1, agentPosition.Item2);
+        else if (agentPosition.Item2 == 1)
+            return (agentPosition.Item1, 2);
+        else // agentPosition.Item2 == world.Height
+            return (agentPosition.Item1, world.Height - 1);
+    }
+    throw new Exception("No Stench detected at the given agent position");
 }
 
 
@@ -608,57 +640,63 @@ internal class Program
         }
 
         private bool InferFact(string query)
-        {
-            if (query.StartsWith("NoPit"))
-            {
-                var (x, y) = ParseCoordinates(query);
-                return !facts.Contains($"Pit({x},{y})");
-            }
+{
+    if (query.StartsWith("NoPit"))
+    {
+        var (x, y) = ParseCoordinates(query);
+        return !facts.Contains($"Pit({x},{y})");
+    }
 
-            if (query.StartsWith("NoWumpus"))
-            {
-                var (x, y) = ParseCoordinates(query);
-                return !facts.Contains($"Wumpus({x},{y})");
-            }
+    if (query.StartsWith("NoWumpus"))
+    {
+        var (x, y) = ParseCoordinates(query);
+        return !facts.Contains($"Wumpus({x},{y})");
+    }
 
-            if (query.StartsWith("Safe"))
-            {
-                var (x, y) = ParseCoordinates(query);
-                return !facts.Contains($"Pit({x},{y})") && !facts.Contains($"Wumpus({x},{y})");
-            }
+    if (query.StartsWith("Stench"))
+    {
+        var (x, y) = ParseCoordinates(query);
+        return facts.Contains($"Stench({x},{y})");
+    }
 
-            if (query.StartsWith("Pit"))
-            {
-                var (x, y) = ParseCoordinates(query);
-                return facts.Contains($"Pit({x},{y})");
-            }
+    if (query.StartsWith("Safe"))
+    {
+        var (x, y) = ParseCoordinates(query);
+        return !facts.Contains($"Pit({x},{y})") && !facts.Contains($"Wumpus({x},{y})");
+    }
 
-            if (query.StartsWith("Wumpus"))
-            {
-                var (x, y) = ParseCoordinates(query);
-                return facts.Contains($"Wumpus({x},{y})");
-            }
+    if (query.StartsWith("Pit"))
+    {
+        var (x, y) = ParseCoordinates(query);
+        return facts.Contains($"Pit({x},{y})");
+    }
 
-            if (query.StartsWith("Gold"))
-            {
-                var (x, y) = ParseCoordinates(query);
-                return facts.Contains($"Gold({x},{y})");
-            }
+    if (query.StartsWith("Wumpus"))
+    {
+        var (x, y) = ParseCoordinates(query);
+        return facts.Contains($"Wumpus({x},{y})");
+    }
 
-            if (query.StartsWith("GoldCollected"))
-            {
-                var (x, y) = ParseCoordinates(query);
-                return facts.Contains($"GoldCollected({x},{y})");
-            }
+    if (query.StartsWith("Gold"))
+    {
+        var (x, y) = ParseCoordinates(query);
+        return facts.Contains($"Gold({x},{y})");
+    }
 
-            if (query.StartsWith("Visited"))
-            {
-                var (x, y) = ParseCoordinates(query);
-                return facts.Contains($"Visited({x},{y})");
-            }
+    if (query.StartsWith("GoldCollected"))
+    {
+        var (x, y) = ParseCoordinates(query);
+        return facts.Contains($"GoldCollected({x},{y})");
+    }
 
-            return false;
-        }
+    if (query.StartsWith("Visited"))
+    {
+        var (x, y) = ParseCoordinates(query);
+        return facts.Contains($"Visited({x},{y})");
+    }
+
+    return false;
+}
 
         private (int x, int y) ParseCoordinates(string fact)
         {

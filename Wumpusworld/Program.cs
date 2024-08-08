@@ -193,7 +193,7 @@ internal class Program
 
         private void HandlePerception(string perception)
 {
-    switch (perception)
+   switch (perception)
     {
         case "Breeze":
             kb.Tell($"Breeze({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
@@ -218,9 +218,12 @@ internal class Program
             Log($"Agent died! Stepped into a Pit");
             break;
         case "Wumpus":
-            kb.Tell($"Wumpus({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
-            Log($"Found out Wumpus is on field {world.AgentPosition}");
-            if (hasArrow && !kb.Ask($"Wumpus({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
+            if (!kb.Ask($"Wumpus({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
+            {
+                kb.Tell($"Wumpus({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
+                Log($"Found out Wumpus is on field {world.AgentPosition}");
+            }
+            if (hasArrow)
             {
                 ShootArrow();
             }
@@ -270,9 +273,9 @@ private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
     if (kb.Ask($"Stench({agentPosition.Item1},{agentPosition.Item2})"))
     {
         if (agentPosition.Item1 == 1)
-            return (2, agentPosition.Item2);
+            return (1, agentPosition.Item2 + 1);
         else if (agentPosition.Item1 == world.Width)
-            return (world.Width - 1, agentPosition.Item2);
+            return (world.Width, agentPosition.Item2 + 1);
         else if (agentPosition.Item2 == 1)
             return (agentPosition.Item1, 2);
         else // agentPosition.Item2 == world.Height
@@ -641,7 +644,7 @@ private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
 
         private bool InferFact(string query)
 {
-    if (query.StartsWith("NoPit"))
+     if (query.StartsWith("NoPit"))
     {
         var (x, y) = ParseCoordinates(query);
         return !facts.Contains($"Pit({x},{y})");
@@ -657,6 +660,12 @@ private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
     {
         var (x, y) = ParseCoordinates(query);
         return facts.Contains($"Stench({x},{y})");
+    }
+
+    if (query.StartsWith("Breeze"))
+    {
+        var (x, y) = ParseCoordinates(query);
+        return facts.Contains($"Breeze({x},{y})");
     }
 
     if (query.StartsWith("Safe"))

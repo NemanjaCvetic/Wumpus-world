@@ -165,102 +165,156 @@ internal class Program
         public void Play()
         {
             while (isAlive)
-            {
-                (int, int) nextMove = PlanNextMove();
-                Move(nextMove);
+    {
+        (int, int) nextMove = PlanNextMove();
+        Move(nextMove);
 
-                PerceiveEnvironment();
-                if (!isAlive) break;
+        PerceiveEnvironment();
+        if (!isAlive) break;
 
-                if (world.AgentPosition == world.GoalPosition)
-                {
-                    Log($"Reached the goal! Final score: {score}");
-                    break;
-                }
-            }
-            PrintActionLog();
-        }
-
-        private void PerceiveEnvironment()
+        if (world.AgentPosition == world.GoalPosition)
         {
-            var perceptions = world.GetCell(world.AgentPosition.Item1, world.AgentPosition.Item2);
-            foreach (var perception in perceptions)
-            {
-                HandlePerception(perception);
-            }
+            Log($"Reached the goal! Final score: {score}");
+            break;
         }
+    }
+
+    PrintActionLog();
+        }
+
+       private void PerceiveEnvironment()
+{
+    var perceptions = world.GetCell(world.AgentPosition.Item1, world.AgentPosition.Item2);
+    foreach (var perception in perceptions)
+    {
+        HandlePerception(perception);
+    }
+}
 
         private void HandlePerception(string perception)
-        {
-            switch (perception)
+{
+    switch (perception)
+    {
+        case "Breeze":
+            kb.Tell($"Breeze({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
+            Log($"Breeze sensed at {world.AgentPosition}");
+            UpdateAdjacentCellsKnowledge();
+            break;
+        case "Smell":
+            kb.Tell($"Stench({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
+            Log($"Smell sensed at {world.AgentPosition}");
+            DeduceWumpusLocation();
+            break;
+        case "Gold":
+            kb.Tell($"Gold({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
+            Log($"Gold found at {world.AgentPosition}");
+            score += 1000;
+            break;
+        case "Pit":
+            kb.Tell($"Pit({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
+            Log($"Found out pit is on field {world.AgentPosition}");
+            isAlive = false;
+            score -= 1000;
+            Log($"Agent died! Stepped into a Pit");
+            break;
+        case "Wumpus":
+            kb.Tell($"Wumpus({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
+            Log($"Found out Wumpus is on field {world.AgentPosition}");
+            if (hasArrow && !kb.Ask($"Wumpus({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
             {
-                case "Breeze":
-                    kb.Tell($"Breeze({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
-                    Log($"Breeze sensed at {world.AgentPosition}");
-                    break;
-                case "Smell":
-                    kb.Tell($"Stench({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
-                    Log($"Smell sensed at {world.AgentPosition}");
-                    break;
-                case "Gold":
-                    kb.Tell($"Gold({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
-                    Log($"Gold found at {world.AgentPosition}");
-                    score += 1000;
-                    break;
-                case "Pit":
-                    kb.Tell($"Pit({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
-                    Log($"Found out pit is on field {world.AgentPosition}");
-                    isAlive = false;
-                    score -= 1000;
-                    break;
-                case "Wumpus":
-                    kb.Tell($"Wumpus({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
-                    Log($"Found out Wumpus is on field {world.AgentPosition}");
-                    isAlive = false;
-                    score -= 1000;
-                    break;
+                ShootArrow();
+            }
+            else
+            {
+                isAlive = false;
+                score -= 1000;
+                Log($"Agent died! Stepped into a Wumpus");
+            }
+            break;
+    }
+}
+
+     private void DeduceWumpusLocation()
+{
+    for (int x = 1; x <= world.Width; x++)
+    {
+        for (int y = 1; y <= world.Height; y++)
+        {
+            if (kb.Ask($"Stench({x},{y})") && !kb.Ask($"Wumpus({x},{y})"))
+            {
+                kb.Tell($"Wumpus({x},{y})");
+                Log($"Deduced that the Wumpus is on field ({x},{y})");
             }
         }
+    }
+}
 
 
 
-        private void UpdateAdjacentCellsKnowledge()
+
+       private void UpdateAdjacentCellsKnowledge()
+{
+    var adjacentCells = GetAdjacentCells(world.AgentPosition);
+    foreach (var cell in adjacentCells)
+    {
+        if (!kb.Ask($"Visited({cell.Item1},{cell.Item2})"))
         {
-            var adjacentCells = GetAdjacentCells(world.AgentPosition);
-            foreach (var cell in adjacentCells)
+            if (!kb.Ask($"Breeze({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
             {
-                if (!kb.Ask($"Visited({cell.Item1},{cell.Item2})"))
+                kb.Tell($"NoPit({cell.Item1},{cell.Item2})");
+            }
+            if (!kb.Ask($"Stench({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
+            {
+                kb.Tell($"NoWumpus({cell.Item1},{cell.Item2})");
+            }
+        }
+    }
+}
+
+       private (int, int) PlanNextMove()
+{
+    if (plannedPath.Count == 0)
+    {
+        plannedPath = PlanPath();
+    }
+
+    if (plannedPath.Count > 0)
+    {
+        var nextMove = plannedPath.Dequeue();
+        if (kb.Ask($"Wumpus({nextMove.Item1},{nextMove.Item2})") || kb.Ask($"Pit({nextMove.Item1},{nextMove.Item2})"))
+        {
+            if (hasArrow && kb.Ask($"Wumpus({nextMove.Item1},{nextMove.Item2})"))
+            {
+                ShootArrow();
+                return world.AgentPosition;  // Stay in place after shooting
+            }
+            else
+            {
+                isAlive = false;
+                score -= 1000;
+                if (kb.Ask($"Wumpus({nextMove.Item1},{nextMove.Item2})"))
                 {
-                    if (!kb.Ask($"Breeze({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
-                    {
-                        kb.Tell($"NoPit({cell.Item1},{cell.Item2})");
-                    }
-                    if (!kb.Ask($"Stench({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
-                    {
-                        kb.Tell($"NoWumpus({cell.Item1},{cell.Item2})");
-                    }
+                    Log($"Agent died! Stepped into a Wumpus");
                 }
+                else
+                {
+                    Log($"Agent died! Stepped into a Pit");
+                }
+                return world.AgentPosition;
             }
         }
-
-        private (int, int) PlanNextMove()
+        else
         {
-            if (plannedPath.Count == 0)
-            {
-                plannedPath = PlanPath();
-            }
-
-            if (plannedPath.Count > 0)
-            {
-                var nextMove = plannedPath.Dequeue();
-                Log($"Move to field {nextMove}");
-                return nextMove;
-            }
-
-            var safestMove = GetSafestMove();
-            Log($"Move to field {safestMove}");
-            return safestMove;
+            Log($"Move to field {nextMove}");
+            return nextMove;
         }
+    }
+
+    var safestMove = GetSafestMove();
+    Log($"Move to field {safestMove}");
+    return safestMove;
+}
+
 
         private Queue<(int, int)> PlanPath()
         {
@@ -392,40 +446,41 @@ internal class Program
             return Math.Abs(a.Item1 - b.Item1) + Math.Abs(a.Item2 - b.Item2);
         }
 
-        private (int, int) GetSafestMove()
-        {
-            var adjacentCells = GetAdjacentCells(world.AgentPosition);
-            var safeCells = adjacentCells.Where(IsSafe).ToList();
+       private (int, int) GetSafestMove()
+{
+    var adjacentCells = GetAdjacentCells(world.AgentPosition);
+    var safeCells = adjacentCells.Where(IsSafe).ToList();
 
-            if (safeCells.Any())
-            {
-                return safeCells.OrderBy(DistanceToGoal).First();
-            }
+    if (safeCells.Any())
+    {
+        return safeCells.OrderBy(DistanceToGoal).First();
+    }
 
-            // If no safe moves, consider shooting the arrow
-            if (hasArrow)
-            {
-                ShootArrow();
-                return world.AgentPosition;  // Stay in place after shooting
-            }
+    // If no safe moves, consider shooting the arrow
+    if (hasArrow)
+    {
+        ShootArrow();
+        return world.AgentPosition;  // Stay in place after shooting
+    }
 
-            // If no safe moves and no arrow, take the least dangerous move
-            return adjacentCells.OrderBy(cell => DangerLevel(cell)).First();
-        }
+    // If no safe moves and no arrow, take the least dangerous move
+    return adjacentCells.OrderBy(cell => DangerLevel(cell)).First();
+}
 
-        private int DangerLevel((int, int) cell)
-        {
-            int danger = 0;
-            if (kb.Ask($"Pit({cell.Item1},{cell.Item2})")) danger += 10;
-            if (kb.Ask($"Wumpus({cell.Item1},{cell.Item2})")) danger += 100;
-            return danger;
-        }
 
-        private bool IsSafe((int, int) cell)
-        {
-            return kb.Ask($"NoPit({cell.Item1},{cell.Item2})") &&
-                   kb.Ask($"NoWumpus({cell.Item1},{cell.Item2})");
-        }
+       private int DangerLevel((int, int) cell)
+{
+    int danger = 0;
+    if (kb.Ask($"Pit({cell.Item1},{cell.Item2})")) danger += 10;
+    if (kb.Ask($"Wumpus({cell.Item1},{cell.Item2})")) danger += 100;
+    return danger;
+}
+
+       private bool IsSafe((int, int) cell)
+{
+    return kb.Ask($"NoPit({cell.Item1},{cell.Item2})") &&
+           kb.Ask($"NoWumpus({cell.Item1},{cell.Item2})");
+}
 
         private List<(int, int)> GetAdjacentCells((int, int) cell)
         {
@@ -506,7 +561,10 @@ internal class Program
 
         private void Log(string message)
         {
-            actionLog.Add($"[Turn {actionLog.Count + 1}] {message}");
+           if (isAlive)
+    {
+        actionLog.Add($"[Turn {actionLog.Count + 1}] {message}");
+    }
         }
 
         private void PrintActionLog()
@@ -535,6 +593,8 @@ internal class Program
             Tell("all x y (Adjacent(x,y) <-> Adjacent(y,x)).");
             Tell("all x y (Breeze(x,y) <-> exists z (Adjacent(x,y,z) & Pit(z))).");
             Tell("all x y (Stench(x,y) <-> exists z (Adjacent(x,y,z) & Wumpus(z))).");
+            Tell("all x y (NoPit(x,y) <-> !Pit(x,y)).");
+            Tell("all x y (NoWumpus(x,y) <-> !Wumpus(x,y)).");
         }
 
         public void Tell(string fact)

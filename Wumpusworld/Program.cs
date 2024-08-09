@@ -5,6 +5,97 @@ internal class Program
 {
 
 
+    /*
+
+    In this assignment you'll need to implement a variant of the »Wumpus world« game (see: AIMA3e book, chapter 7.2, pp. 236 - 240). The goal of the game is to »safely« traverse the cave and exit with a maximal number of points. The definition of the »Wumpus world« game is the same as that from the book with the following corrections:
+
+    The gold is not just one, but there can be many of it scattered on different places of the cave;
+    The size of the cave is M x N, where M, N, the position of pits, gold and the Wumpus are given in advance in the form of a text file; 
+    (wumpus_world.txt - the exact format is given later on);
+    The price of shooting the (only) arrow is -100 points;
+    The start position of the agent is facing right.
+
+Your assignment is to:
+
+    Implement a »smart« agent capable of navigating the cave, avoiding pits and the Wumpus, picking up as much gold as possible (or maximise the number of points), and reach the exit point of the cave - field (x,y) that is defined in advance as the goal field. Agent's input should be the text file wumpus_world.txt. The output should be the »trace« of the agent together with all logical entailments for every move of the agent;
+    Generate test worlds (at least three) - files »wumpus_world.txt« - that will serve as the input for the agent;
+    Write a report describing your solution. The report should include: the description of the methods that you tested (can be in pseudocode), the description of the first order logic part of the agent's reasoning, the description of problems that you encountered during the process of implementing your solutions.
+
+You'll implement the agent as a hybrid algorithm that integrates logical induction, search and background knowledge (knowledge base). You have to take into consideration the following constraints:
+
+    Your agent has to integrate with some knowledge base in the form of a TELL-ASK interface: with the TELL command the perceptions of the agent are entered into the knowledge base, the ASK command is used to query the knowledge base if a determined field is »safe«. The knowledge base should be a first order logic base. 
+
+    You need to implement a search algorithm (A* or some other search algorithm) to plan a route to a given field and interface it to the agent;
+    Your agent can read the whole cave map at once, but must not »see« fields, that it didn't yet visit - e.g. it should not know that there's gold on the field (2,3) until it visits that field. The only exceptions are the labels Mxy, Axy and GOxy - see below for »label meaning«. To be sure your agents doesn't »peep«, you'll have to output every move that the agent makes, e.g.:
+
+        Move to field (2,1)
+        Breeze sensed
+        Move to field (1,1)
+        Move to field (1,2)
+        Smell sensed
+        Found out Wumpus is on field (1,3)
+        Found out pit is on field (3,1)
+        Move to field (2,2)
+
+Representation of the Wumpus world:
+
+    Example of the wumpus_world.txt file:
+
+A11
+
+B21
+
+P31
+
+B41
+
+S12
+
+B32
+
+W13
+
+S23
+
+G23
+
+B23
+
+P33
+
+B43
+
+S14
+
+B34
+
+P44
+
+M44
+
+GO11
+
+    Meaning of labels in the above example:
+
+Axy  = Agent is on the field (x,y)
+
+Bxy  = The field (x,y) is breezy
+
+Gxy  = There's gold on the field (x,y)
+
+GOxy = (x,y) is the goal field - exit from the cave
+
+Mxy  = The cave is x fields wide and y fields high (map size)
+
+Pxy  = There's a pit on the field (x,y)
+
+Sxy  = The field (x,y) is smelly
+
+Wxy  = There's the Wumpus on the field (x,y)
+
+    */
+
+
 
     private static void Main(string[] args)
     {
@@ -195,14 +286,16 @@ internal class Program
 {
    switch (perception)
     {
-        case "Breeze":
+          case "Breeze":
             kb.Tell($"Breeze({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
             Log($"Breeze sensed at {world.AgentPosition}");
             UpdateAdjacentCellsKnowledge();
+            DeducePitLocations();
             break;
         case "Smell":
             kb.Tell($"Stench({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
             Log($"Smell sensed at {world.AgentPosition}");
+            UpdateAdjacentCellsKnowledge();
             DeduceWumpusLocation();
             break;
         case "Gold":
@@ -239,49 +332,89 @@ internal class Program
 
     private void DeduceWumpusLocation()
 {
-    // Check if the agent is on the edge of the world
-    if (world.AgentPosition.Item1 == 1 || world.AgentPosition.Item1 == world.Width ||
-        world.AgentPosition.Item2 == 1 || world.AgentPosition.Item2 == world.Height)
+   if (kb.Ask($"Stench({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
     {
-        // If the agent senses a Stench, the Wumpus must be in the adjacent cell in the direction of the edge
-        if (kb.Ask($"Stench({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
+        var adjacentCells = GetAdjacentCells(world.AgentPosition);
+        var possibleWumpusCells = adjacentCells.Where(cell => 
+            !kb.Ask($"Visited({cell.Item1},{cell.Item2})") && 
+            !kb.Ask($"NoWumpus({cell.Item1},{cell.Item2})")
+        ).ToList();
+
+        if (possibleWumpusCells.Count == 1)
         {
-            (int, int) wumpusPosition = GetWumpusPositionFromStench(world.AgentPosition);
-            kb.Tell($"Wumpus({wumpusPosition.Item1},{wumpusPosition.Item2})");
-            Log($"Deduced that the Wumpus is on field ({wumpusPosition.Item1},{wumpusPosition.Item2})");
+            var wumpusCell = possibleWumpusCells[0];
+            kb.Tell($"Wumpus({wumpusCell.Item1},{wumpusCell.Item2})");
+            Log($"Deduced that the Wumpus is on field ({wumpusCell.Item1},{wumpusCell.Item2})");
+        }
+        else if (IsOnEdge(world.AgentPosition))
+        {
+            var wumpusCell = GetWumpusPositionFromStench(world.AgentPosition);
+            kb.Tell($"Wumpus({wumpusCell.Item1},{wumpusCell.Item2})");
+            Log($"Deduced that the Wumpus is on field ({wumpusCell.Item1},{wumpusCell.Item2})");
+        }
+    }
+}
+
+private bool IsOnEdge((int, int) position)
+{
+    return position.Item1 == 1 || position.Item1 == world.Width ||
+           position.Item2 == 1 || position.Item2 == world.Height;
+}
+
+
+private void DeducePitLocations()
+{
+     if (kb.Ask($"Breeze({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
+    {
+        var adjacentCells = GetAdjacentCells(world.AgentPosition);
+        foreach (var cell in adjacentCells)
+        {
+            if (!kb.Ask($"Visited({cell.Item1},{cell.Item2})") && 
+                !kb.Ask($"NoPit({cell.Item1},{cell.Item2})"))
+            {
+                kb.Tell($"PossiblePit({cell.Item1},{cell.Item2})");
+                Log($"Marked possible Pit on field ({cell.Item1},{cell.Item2})");
+            }
         }
     }
     else
     {
-        // For non-edge cells, use the previous deduction logic
-        for (int x = 1; x <= world.Width; x++)
+        // If there's no breeze, we can mark all adjacent cells as safe
+        var adjacentCells = GetAdjacentCells(world.AgentPosition);
+        foreach (var cell in adjacentCells)
         {
-            for (int y = 1; y <= world.Height; y++)
+            if (!kb.Ask($"Visited({cell.Item1},{cell.Item2})"))
             {
-                if (kb.Ask($"Stench({x},{y})") && !kb.Ask($"Wumpus({x},{y})"))
-                {
-                    kb.Tell($"Wumpus({x},{y})");
-                    Log($"Deduced that the Wumpus is on field ({x},{y})");
-                }
+                kb.Tell($"NoPit({cell.Item1},{cell.Item2})");
+                Log($"Marked no Pit on field ({cell.Item1},{cell.Item2})");
             }
         }
     }
 }
 
+private (int, int) GetPitPositionFromBreeze((int, int) agentPosition)
+{
+    if (agentPosition.Item1 == 1)
+        return (1, agentPosition.Item2 + 1);
+    else if (agentPosition.Item1 == world.Width)
+        return (world.Width - 1, agentPosition.Item2);
+    else if (agentPosition.Item2 == 1)
+        return (agentPosition.Item1, 2);
+    else // agentPosition.Item2 == world.Height
+        return (agentPosition.Item1, world.Height - 1);
+}
+
+
 private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
 {
-    if (kb.Ask($"Stench({agentPosition.Item1},{agentPosition.Item2})"))
-    {
-        if (agentPosition.Item1 == 1)
-            return (1, agentPosition.Item2 + 1);
-        else if (agentPosition.Item1 == world.Width)
-            return (world.Width, agentPosition.Item2 + 1);
-        else if (agentPosition.Item2 == 1)
-            return (agentPosition.Item1, 2);
-        else // agentPosition.Item2 == world.Height
-            return (agentPosition.Item1, world.Height - 1);
-    }
-    throw new Exception("No Stench detected at the given agent position");
+    if (agentPosition.Item1 == 1)
+        return (1, agentPosition.Item2 + 1);
+    else if (agentPosition.Item1 == world.Width)
+        return (world.Width, agentPosition.Item2 + 1);
+    else if (agentPosition.Item2 == 1)
+        return (agentPosition.Item1, 2);
+    else // agentPosition.Item2 == world.Height
+        return (agentPosition.Item1, world.Height - 1);
 }
 
 
@@ -289,18 +422,30 @@ private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
 
        private void UpdateAdjacentCellsKnowledge()
 {
-    var adjacentCells = GetAdjacentCells(world.AgentPosition);
+     var adjacentCells = GetAdjacentCells(world.AgentPosition);
+    bool breezeDetected = kb.Ask($"Breeze({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
+    bool stenchDetected = kb.Ask($"Stench({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
+
     foreach (var cell in adjacentCells)
     {
         if (!kb.Ask($"Visited({cell.Item1},{cell.Item2})"))
         {
-            if (!kb.Ask($"Breeze({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
+            if (!breezeDetected)
             {
                 kb.Tell($"NoPit({cell.Item1},{cell.Item2})");
             }
-            if (!kb.Ask($"Stench({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
+            else
+            {
+                kb.Tell($"PossiblePit({cell.Item1},{cell.Item2})");
+            }
+
+            if (!stenchDetected)
             {
                 kb.Tell($"NoWumpus({cell.Item1},{cell.Item2})");
+            }
+            else
+            {
+                kb.Tell($"PossibleWumpus({cell.Item1},{cell.Item2})");
             }
         }
     }
@@ -654,6 +799,17 @@ private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
     {
         var (x, y) = ParseCoordinates(query);
         return !facts.Contains($"Wumpus({x},{y})");
+    }
+    if (query.StartsWith("PossiblePit"))
+    {
+        var (x, y) = ParseCoordinates(query);
+        return facts.Contains($"PossiblePit({x},{y})");
+    }
+
+    if (query.StartsWith("PossibleWumpus"))
+    {
+        var (x, y) = ParseCoordinates(query);
+        return facts.Contains($"PossibleWumpus({x},{y})");
     }
 
     if (query.StartsWith("Stench"))

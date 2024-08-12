@@ -275,11 +275,20 @@ Wxy  = There's the Wumpus on the field (x,y)
 
        private void PerceiveEnvironment()
 {
-    var perceptions = world.GetCell(world.AgentPosition.Item1, world.AgentPosition.Item2);
+     var perceptions = world.GetCell(world.AgentPosition.Item1, world.AgentPosition.Item2);
+    bool breezeDetected = false;
+    bool stenchDetected = false;
+
     foreach (var perception in perceptions)
     {
         HandlePerception(perception);
+        if (perception == "Breeze") breezeDetected = true;
+        if (perception == "Smell") stenchDetected = true;
     }
+
+    UpdateAdjacentCellsKnowledge(breezeDetected, stenchDetected);
+    DeducePitLocations();
+    DeduceWumpusLocation();
 }
 
         private void HandlePerception(string perception)
@@ -289,13 +298,12 @@ Wxy  = There's the Wumpus on the field (x,y)
           case "Breeze":
             kb.Tell($"Breeze({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
             Log($"Breeze sensed at {world.AgentPosition}");
-            UpdateAdjacentCellsKnowledge();
             DeducePitLocations();
             break;
         case "Smell":
             kb.Tell($"Stench({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
             Log($"Smell sensed at {world.AgentPosition}");
-            UpdateAdjacentCellsKnowledge();
+           
             DeduceWumpusLocation();
             break;
         case "Gold":
@@ -364,33 +372,73 @@ private bool IsOnEdge((int, int) position)
 
 private void DeducePitLocations()
 {
-     if (kb.Ask($"Breeze({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
+    for (int x = 1; x <= world.Width; x++)
     {
-        var adjacentCells = GetAdjacentCells(world.AgentPosition);
-        foreach (var cell in adjacentCells)
+        for (int y = 1; y <= world.Height; y++)
         {
-            if (!kb.Ask($"Visited({cell.Item1},{cell.Item2})") && 
-                !kb.Ask($"NoPit({cell.Item1},{cell.Item2})"))
+            if (kb.Ask($"PossiblePit({x},{y})") && !kb.Ask($"Visited({x},{y})") && !kb.Ask($"NoPit({x},{y})"))
             {
-                kb.Tell($"PossiblePit({cell.Item1},{cell.Item2})");
-                Log($"Marked possible Pit on field ({cell.Item1},{cell.Item2})");
-            }
-        }
-    }
-    else
-    {
-        // If there's no breeze, we can mark all adjacent cells as safe
-        var adjacentCells = GetAdjacentCells(world.AgentPosition);
-        foreach (var cell in adjacentCells)
-        {
-            if (!kb.Ask($"Visited({cell.Item1},{cell.Item2})"))
-            {
-                kb.Tell($"NoPit({cell.Item1},{cell.Item2})");
-                Log($"Marked no Pit on field ({cell.Item1},{cell.Item2})");
+                var adjacentCells = GetAdjacentCells((x, y));
+                var breezyAdjacentCells = adjacentCells.Where(cell => 
+                    kb.Ask($"Visited({cell.Item1},{cell.Item2})") && 
+                    kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
+                ).ToList();
+
+                var nonBreezyAdjacentCells = adjacentCells.Where(cell => 
+                    kb.Ask($"Visited({cell.Item1},{cell.Item2})") && 
+                    !kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
+                ).ToList();
+
+                if (breezyAdjacentCells.Count > 0 && nonBreezyAdjacentCells.Count == 0)
+                {
+                    kb.Tell($"Pit({x},{y})");
+                    Log($"Deduced that there is a Pit on field ({x},{y})");
+                }
+                else if (nonBreezyAdjacentCells.Count > 0)
+                {
+                    kb.Tell($"NoPit({x},{y})");
+                    Log($"Deduced that there is no Pit on field ({x},{y})");
+                }
             }
         }
     }
 }
+
+private void DeducePitFromCurrentKnowledge()
+{
+     for (int x = 1; x <= world.Width; x++)
+    {
+        for (int y = 1; y <= world.Height; y++)
+        {
+            if (kb.Ask($"PossiblePit({x},{y})") && !kb.Ask($"Visited({x},{y})"))
+            {
+                var adjacentCells = GetAdjacentCells((x, y));
+                var breezyAdjacentCells = adjacentCells.Where(cell => 
+                    kb.Ask($"Visited({cell.Item1},{cell.Item2})") && 
+                    kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
+                ).ToList();
+
+                var nonBreezyAdjacentCells = adjacentCells.Where(cell => 
+                    kb.Ask($"Visited({cell.Item1},{cell.Item2})") && 
+                    !kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
+                ).ToList();
+
+                if (breezyAdjacentCells.Count > 0 && nonBreezyAdjacentCells.Count == 0)
+                {
+                    kb.Tell($"Pit({x},{y})");
+                    Log($"Deduced that there is a Pit on field ({x},{y})");
+                }
+                else if (nonBreezyAdjacentCells.Count > 0)
+                {
+                    kb.Tell($"NoPit({x},{y})");
+                    Log($"Deduced that there is no Pit on field ({x},{y})");
+                }
+            }
+        }
+    }
+}
+
+
 
 private (int, int) GetPitPositionFromBreeze((int, int) agentPosition)
 {
@@ -420,11 +468,10 @@ private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
 
 
 
-       private void UpdateAdjacentCellsKnowledge()
+       private void UpdateAdjacentCellsKnowledge(bool breezeDetected, bool stenchDetected)
 {
      var adjacentCells = GetAdjacentCells(world.AgentPosition);
-    bool breezeDetected = kb.Ask($"Breeze({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
-    bool stenchDetected = kb.Ask($"Stench({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
+    
 
     foreach (var cell in adjacentCells)
     {
@@ -703,25 +750,26 @@ private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
         }
 
         private void Move((int, int) nextPosition)
-        {
-            UpdateFacing(nextPosition);
-            world.AgentPosition = nextPosition;
-            score -= 1; // Cost of moving
-            visitedCells.Add(nextPosition);
-            Log($"Moved to {nextPosition}");
+        {UpdateFacing(nextPosition);
+    world.AgentPosition = nextPosition;
+    score -= 1; // Cost of moving
+    visitedCells.Add(nextPosition);
+    Log($"Moved to {nextPosition}");
 
-            kb.Tell($"Visited({nextPosition.Item1},{nextPosition.Item2})");
+    kb.Tell($"Visited({nextPosition.Item1},{nextPosition.Item2})");
+    kb.Tell($"NoPit({nextPosition.Item1},{nextPosition.Item2})");
+    kb.Tell($"NoWumpus({nextPosition.Item1},{nextPosition.Item2})");
 
-            var dangers = world.GetCell(nextPosition.Item1, nextPosition.Item2)
-                .Where(p => p == "Pit" || p == "Wumpus")
-                .ToList();
+    var dangers = world.GetCell(nextPosition.Item1, nextPosition.Item2)
+        .Where(p => p == "Pit" || p == "Wumpus")
+        .ToList();
 
-            if (dangers.Any())
-            {
-                isAlive = false;
-                score -= 1000;  // Penalty for dying
-                Log($"Agent died! Stepped into a {dangers.First()}");
-            }
+    if (dangers.Any())
+    {
+        isAlive = false;
+        score -= 1000;  // Penalty for dying
+        Log($"Agent died! Stepped into a {dangers.First()}");
+    }
         }
 
         private void UpdateFacing((int, int) nextPosition)

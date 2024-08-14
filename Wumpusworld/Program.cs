@@ -260,7 +260,6 @@ Wxy  = There's the Wumpus on the field (x,y)
         (int, int) nextMove = PlanNextMove();
         Move(nextMove);
 
-        PerceiveEnvironment();
         if (!isAlive) break;
 
         if (world.AgentPosition == world.GoalPosition)
@@ -273,9 +272,9 @@ Wxy  = There's the Wumpus on the field (x,y)
     PrintActionLog();
         }
 
-       private void PerceiveEnvironment()
-{
-     var perceptions = world.GetCell(world.AgentPosition.Item1, world.AgentPosition.Item2);
+        private void PerceiveEnvironment()
+        {
+            var perceptions = world.GetCell(world.AgentPosition.Item1, world.AgentPosition.Item2);
     bool breezeDetected = false;
     bool stenchDetected = false;
 
@@ -289,58 +288,52 @@ Wxy  = There's the Wumpus on the field (x,y)
     UpdateAdjacentCellsKnowledge(breezeDetected, stenchDetected);
     DeducePitLocations();
     DeduceWumpusLocation();
-}
+        }
 
         private void HandlePerception(string perception)
-{
-   switch (perception)
+        {
+           switch (perception)
     {
-          case "Breeze":
+        case "Breeze":
             kb.Tell($"Breeze({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
-            Log($"Breeze sensed at {world.AgentPosition}");
-            DeducePitLocations();
+            Log($"Breeze sensed at {world.AgentPosition}", false);
             break;
         case "Smell":
             kb.Tell($"Stench({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
-            Log($"Smell sensed at {world.AgentPosition}");
-           
-            DeduceWumpusLocation();
+            Log($"Smell sensed at {world.AgentPosition}", false);
             break;
         case "Gold":
             kb.Tell($"Gold({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
-            Log($"Gold found at {world.AgentPosition}");
+            Log($"Gold found at {world.AgentPosition}", false);
             score += 1000;
             break;
         case "Pit":
             kb.Tell($"Pit({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
-            Log($"Found out pit is on field {world.AgentPosition}");
+            Log($"Found out pit is on field {world.AgentPosition}", false);
             isAlive = false;
             score -= 1000;
             Log($"Agent died! Stepped into a Pit");
             break;
         case "Wumpus":
-            if (!kb.Ask($"Wumpus({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
-            {
-                kb.Tell($"Wumpus({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
-                Log($"Found out Wumpus is on field {world.AgentPosition}");
-            }
-            if (hasArrow)
-            {
-                ShootArrow();
-            }
-            else
-            {
-                isAlive = false;
-                score -= 1000;
-                Log($"Agent died! Stepped into a Wumpus");
-            }
-            break;
+    if (!kb.Ask($"DeadWumpus({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
+    {
+        kb.Tell($"Wumpus({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
+        Log($"Found out Wumpus is on field {world.AgentPosition}", false);
+        isAlive = false;
+        score -= 1000;
+        Log($"Agent died! Stepped into a live Wumpus");
     }
-}
+    else
+    {
+        Log($"Encountered a dead Wumpus at {world.AgentPosition}", false);
+    }
+    break;
+    }
+        }
 
-    private void DeduceWumpusLocation()
-{
-   if (kb.Ask($"Stench({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
+        private void DeduceWumpusLocation()
+        {
+            if (kb.Ask($"Stench({world.AgentPosition.Item1},{world.AgentPosition.Item2})"))
     {
         var adjacentCells = GetAdjacentCells(world.AgentPosition);
         var possibleWumpusCells = adjacentCells.Where(cell => 
@@ -351,196 +344,195 @@ Wxy  = There's the Wumpus on the field (x,y)
         if (possibleWumpusCells.Count == 1)
         {
             var wumpusCell = possibleWumpusCells[0];
-            kb.Tell($"Wumpus({wumpusCell.Item1},{wumpusCell.Item2})");
-            Log($"Deduced that the Wumpus is on field ({wumpusCell.Item1},{wumpusCell.Item2})");
-        }
-        else if (IsOnEdge(world.AgentPosition))
-        {
-            var wumpusCell = GetWumpusPositionFromStench(world.AgentPosition);
-            kb.Tell($"Wumpus({wumpusCell.Item1},{wumpusCell.Item2})");
-            Log($"Deduced that the Wumpus is on field ({wumpusCell.Item1},{wumpusCell.Item2})");
-        }
-    }
-}
-
-private bool IsOnEdge((int, int) position)
-{
-    return position.Item1 == 1 || position.Item1 == world.Width ||
-           position.Item2 == 1 || position.Item2 == world.Height;
-}
-
-
-private void DeducePitLocations()
-{
-    for (int x = 1; x <= world.Width; x++)
-    {
-        for (int y = 1; y <= world.Height; y++)
-        {
-            if (kb.Ask($"PossiblePit({x},{y})") && !kb.Ask($"Visited({x},{y})") && !kb.Ask($"NoPit({x},{y})"))
+            if (!kb.Ask($"Wumpus({wumpusCell.Item1},{wumpusCell.Item2})"))
             {
-                var adjacentCells = GetAdjacentCells((x, y));
-                var breezyAdjacentCells = adjacentCells.Where(cell => 
-                    kb.Ask($"Visited({cell.Item1},{cell.Item2})") && 
-                    kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
-                ).ToList();
-
-                var nonBreezyAdjacentCells = adjacentCells.Where(cell => 
-                    kb.Ask($"Visited({cell.Item1},{cell.Item2})") && 
-                    !kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
-                ).ToList();
-
-                if (breezyAdjacentCells.Count > 0 && nonBreezyAdjacentCells.Count == 0)
+                kb.Tell($"Wumpus({wumpusCell.Item1},{wumpusCell.Item2})");
+                Log($"Deduced that the Wumpus is on field ({wumpusCell.Item1},{wumpusCell.Item2})", false);
+            }
+        }
+                else if (IsOnEdge(world.AgentPosition))
                 {
-                    kb.Tell($"Pit({x},{y})");
-                    Log($"Deduced that there is a Pit on field ({x},{y})");
-                }
-                else if (nonBreezyAdjacentCells.Count > 0)
-                {
-                    kb.Tell($"NoPit({x},{y})");
-                    Log($"Deduced that there is no Pit on field ({x},{y})");
+                    var wumpusCell = GetWumpusPositionFromStench(world.AgentPosition);
+                    kb.Tell($"Wumpus({wumpusCell.Item1},{wumpusCell.Item2})");
+                    Log($"Deduced that the Wumpus is on field ({wumpusCell.Item1},{wumpusCell.Item2})");
                 }
             }
         }
-    }
-}
 
-private void DeducePitFromCurrentKnowledge()
-{
-     for (int x = 1; x <= world.Width; x++)
-    {
-        for (int y = 1; y <= world.Height; y++)
+        private bool IsOnEdge((int, int) position)
         {
-            if (kb.Ask($"PossiblePit({x},{y})") && !kb.Ask($"Visited({x},{y})"))
+            return position.Item1 == 1 || position.Item1 == world.Width ||
+                   position.Item2 == 1 || position.Item2 == world.Height;
+        }
+
+
+        private void DeducePitLocations()
+        {
+            for (int x = 1; x <= world.Width; x++)
             {
-                var adjacentCells = GetAdjacentCells((x, y));
-                var breezyAdjacentCells = adjacentCells.Where(cell => 
-                    kb.Ask($"Visited({cell.Item1},{cell.Item2})") && 
-                    kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
-                ).ToList();
-
-                var nonBreezyAdjacentCells = adjacentCells.Where(cell => 
-                    kb.Ask($"Visited({cell.Item1},{cell.Item2})") && 
-                    !kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
-                ).ToList();
-
-                if (breezyAdjacentCells.Count > 0 && nonBreezyAdjacentCells.Count == 0)
+                for (int y = 1; y <= world.Height; y++)
                 {
-                    kb.Tell($"Pit({x},{y})");
-                    Log($"Deduced that there is a Pit on field ({x},{y})");
-                }
-                else if (nonBreezyAdjacentCells.Count > 0)
-                {
-                    kb.Tell($"NoPit({x},{y})");
-                    Log($"Deduced that there is no Pit on field ({x},{y})");
+                    if (kb.Ask($"PossiblePit({x},{y})") && !kb.Ask($"Visited({x},{y})") && !kb.Ask($"NoPit({x},{y})"))
+                    {
+                        var adjacentCells = GetAdjacentCells((x, y));
+                        var breezyAdjacentCells = adjacentCells.Where(cell =>
+                            kb.Ask($"Visited({cell.Item1},{cell.Item2})") &&
+                            kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
+                        ).ToList();
+
+                        var nonBreezyAdjacentCells = adjacentCells.Where(cell =>
+                            kb.Ask($"Visited({cell.Item1},{cell.Item2})") &&
+                            !kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
+                        ).ToList();
+
+                        if (breezyAdjacentCells.Count > 0 && nonBreezyAdjacentCells.Count == 0)
+                        {
+                            kb.Tell($"Pit({x},{y})");
+                            Log($"Deduced that there is a Pit on field ({x},{y})");
+                        }
+                        else if (nonBreezyAdjacentCells.Count > 0)
+                        {
+                            kb.Tell($"NoPit({x},{y})");
+                            Log($"Deduced that there is no Pit on field ({x},{y})");
+                        }
+                    }
                 }
             }
         }
-    }
-}
 
-
-
-private (int, int) GetPitPositionFromBreeze((int, int) agentPosition)
-{
-    if (agentPosition.Item1 == 1)
-        return (1, agentPosition.Item2 + 1);
-    else if (agentPosition.Item1 == world.Width)
-        return (world.Width - 1, agentPosition.Item2);
-    else if (agentPosition.Item2 == 1)
-        return (agentPosition.Item1, 2);
-    else // agentPosition.Item2 == world.Height
-        return (agentPosition.Item1, world.Height - 1);
-}
-
-
-private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
-{
-    if (agentPosition.Item1 == 1)
-        return (1, agentPosition.Item2 + 1);
-    else if (agentPosition.Item1 == world.Width)
-        return (world.Width, agentPosition.Item2 + 1);
-    else if (agentPosition.Item2 == 1)
-        return (agentPosition.Item1, 2);
-    else // agentPosition.Item2 == world.Height
-        return (agentPosition.Item1, world.Height - 1);
-}
-
-
-
-
-       private void UpdateAdjacentCellsKnowledge(bool breezeDetected, bool stenchDetected)
-{
-     var adjacentCells = GetAdjacentCells(world.AgentPosition);
-    
-
-    foreach (var cell in adjacentCells)
-    {
-        if (!kb.Ask($"Visited({cell.Item1},{cell.Item2})"))
+        private void DeducePitFromCurrentKnowledge()
         {
-            if (!breezeDetected)
+            for (int x = 1; x <= world.Width; x++)
             {
-                kb.Tell($"NoPit({cell.Item1},{cell.Item2})");
-            }
-            else
-            {
-                kb.Tell($"PossiblePit({cell.Item1},{cell.Item2})");
-            }
+                for (int y = 1; y <= world.Height; y++)
+                {
+                    if (kb.Ask($"PossiblePit({x},{y})") && !kb.Ask($"Visited({x},{y})"))
+                    {
+                        var adjacentCells = GetAdjacentCells((x, y));
+                        var breezyAdjacentCells = adjacentCells.Where(cell =>
+                            kb.Ask($"Visited({cell.Item1},{cell.Item2})") &&
+                            kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
+                        ).ToList();
 
-            if (!stenchDetected)
-            {
-                kb.Tell($"NoWumpus({cell.Item1},{cell.Item2})");
-            }
-            else
-            {
-                kb.Tell($"PossibleWumpus({cell.Item1},{cell.Item2})");
+                        var nonBreezyAdjacentCells = adjacentCells.Where(cell =>
+                            kb.Ask($"Visited({cell.Item1},{cell.Item2})") &&
+                            !kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
+                        ).ToList();
+
+                        if (breezyAdjacentCells.Count > 0 && nonBreezyAdjacentCells.Count == 0)
+                        {
+                            kb.Tell($"Pit({x},{y})");
+                            Log($"Deduced that there is a Pit on field ({x},{y})");
+                        }
+                        else if (nonBreezyAdjacentCells.Count > 0)
+                        {
+                            kb.Tell($"NoPit({x},{y})");
+                            Log($"Deduced that there is no Pit on field ({x},{y})");
+                        }
+                    }
+                }
             }
         }
-    }
-}
 
-       private (int, int) PlanNextMove()
-{
-    if (plannedPath.Count == 0)
+
+
+        private (int, int) GetPitPositionFromBreeze((int, int) agentPosition)
+        {
+            if (agentPosition.Item1 == 1)
+                return (1, agentPosition.Item2 + 1);
+            else if (agentPosition.Item1 == world.Width)
+                return (world.Width - 1, agentPosition.Item2);
+            else if (agentPosition.Item2 == 1)
+                return (agentPosition.Item1, 2);
+            else // agentPosition.Item2 == world.Height
+                return (agentPosition.Item1, world.Height - 1);
+        }
+
+
+        private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
+        {
+            if (agentPosition.Item1 == 1)
+                return (1, agentPosition.Item2 + 1);
+            else if (agentPosition.Item1 == world.Width)
+                return (world.Width, agentPosition.Item2 + 1);
+            else if (agentPosition.Item2 == 1)
+                return (agentPosition.Item1, 2);
+            else // agentPosition.Item2 == world.Height
+                return (agentPosition.Item1, world.Height - 1);
+        }
+
+
+
+
+        private void UpdateAdjacentCellsKnowledge(bool breezeDetected, bool stenchDetected)
+        {
+            var adjacentCells = GetAdjacentCells(world.AgentPosition);
+
+            foreach (var cell in adjacentCells)
+            {
+                if (!kb.Ask($"Visited({cell.Item1},{cell.Item2})"))
+                {
+                    if (!breezeDetected)
+                    {
+                        kb.Tell($"NoPit({cell.Item1},{cell.Item2})");
+                    }
+                    else
+                    {
+                        kb.Tell($"PossiblePit({cell.Item1},{cell.Item2})");
+                    }
+
+                    if (!stenchDetected)
+                    {
+                        kb.Tell($"NoWumpus({cell.Item1},{cell.Item2})");
+                    }
+                    else
+                    {
+                        kb.Tell($"PossibleWumpus({cell.Item1},{cell.Item2})");
+                    }
+                }
+            }
+        }
+
+        private (int, int) PlanNextMove()
+        {
+           if (plannedPath.Count == 0)
     {
         plannedPath = PlanPath();
     }
 
     if (plannedPath.Count > 0)
     {
-        var nextMove = plannedPath.Dequeue();
-        if (kb.Ask($"Wumpus({nextMove.Item1},{nextMove.Item2})") || kb.Ask($"Pit({nextMove.Item1},{nextMove.Item2})"))
+        var nextMove = plannedPath.Peek();
+        if (nextMove == world.AgentPosition)
         {
-            if (hasArrow && kb.Ask($"Wumpus({nextMove.Item1},{nextMove.Item2})"))
+            plannedPath.Dequeue(); // Remove the current position from the path
+            return PlanNextMove(); // Recursively plan the next move
+        }
+
+        if (kb.Ask($"Wumpus({nextMove.Item1},{nextMove.Item2})") && !kb.Ask($"DeadWumpus({nextMove.Item1},{nextMove.Item2})"))
+        {
+            if (hasArrow)
             {
                 ShootArrow();
+                plannedPath.Clear(); // Clear the path after shooting to re-evaluate
                 return world.AgentPosition;  // Stay in place after shooting
             }
             else
             {
-                isAlive = false;
-                score -= 1000;
-                if (kb.Ask($"Wumpus({nextMove.Item1},{nextMove.Item2})"))
-                {
-                    Log($"Agent died! Stepped into a Wumpus");
-                }
-                else
-                {
-                    Log($"Agent died! Stepped into a Pit");
-                }
-                return world.AgentPosition;
+                // If we've shot and missed, we need to find a new path
+                plannedPath.Clear();
+                return GetSafestMove();
             }
         }
-        else
+
+        if (!kb.Ask($"Pit({nextMove.Item1},{nextMove.Item2})"))
         {
-            Log($"Move to field {nextMove}");
-            return nextMove;
+            return plannedPath.Dequeue();
         }
     }
 
-    var safestMove = GetSafestMove();
-    Log($"Move to field {safestMove}");
-    return safestMove;
-}
+    return GetSafestMove();
+        }
 
 
         private Queue<(int, int)> PlanPath()
@@ -673,14 +665,18 @@ private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
             return Math.Abs(a.Item1 - b.Item1) + Math.Abs(a.Item2 - b.Item2);
         }
 
-       private (int, int) GetSafestMove()
-{
-    var adjacentCells = GetAdjacentCells(world.AgentPosition);
-    var safeCells = adjacentCells.Where(IsSafe).ToList();
+        private (int, int) GetSafestMove()
+        {
+             var adjacentCells = GetAdjacentCells(world.AgentPosition);
+    var safeCells = adjacentCells.Where(cell => 
+        IsSafe(cell) || kb.Ask($"DeadWumpus({cell.Item1},{cell.Item2})")
+    ).ToList();
 
     if (safeCells.Any())
     {
-        return safeCells.OrderBy(DistanceToGoal).First();
+        return safeCells.OrderBy(cell => kb.Ask($"PossiblePit({cell.Item1},{cell.Item2})") ? 1 : 0)
+                        .ThenBy(DistanceToGoal)
+                        .First();
     }
 
     // If no safe moves, consider shooting the arrow
@@ -692,22 +688,22 @@ private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
 
     // If no safe moves and no arrow, take the least dangerous move
     return adjacentCells.OrderBy(cell => DangerLevel(cell)).First();
-}
+        }
 
 
-       private int DangerLevel((int, int) cell)
-{
-    int danger = 0;
-    if (kb.Ask($"Pit({cell.Item1},{cell.Item2})")) danger += 10;
-    if (kb.Ask($"Wumpus({cell.Item1},{cell.Item2})")) danger += 100;
-    return danger;
-}
+        private int DangerLevel((int, int) cell)
+        {
+            int danger = 0;
+            if (kb.Ask($"Pit({cell.Item1},{cell.Item2})")) danger += 10;
+            if (kb.Ask($"Wumpus({cell.Item1},{cell.Item2})")) danger += 100;
+            return danger;
+        }
 
-       private bool IsSafe((int, int) cell)
-{
-    return kb.Ask($"NoPit({cell.Item1},{cell.Item2})") &&
-           kb.Ask($"NoWumpus({cell.Item1},{cell.Item2})");
-}
+        private bool IsSafe((int, int) cell)
+        {
+            return (!kb.Ask($"Pit({cell.Item1},{cell.Item2})") || kb.Ask($"NoPit({cell.Item1},{cell.Item2})")
+                  && !kb.Ask($"Wumpus({cell.Item1},{cell.Item2})"));
+        }
 
         private List<(int, int)> GetAdjacentCells((int, int) cell)
         {
@@ -725,16 +721,28 @@ private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
 
         private void ShootArrow()
         {
-            hasArrow = false;
-            score -= 100;
-            Log("Arrow shot!");
+            if (!hasArrow) return;
 
-            (int, int) target = GetTargetCell();
-            if (kb.Ask($"Wumpus({target.Item1},{target.Item2})"))
-            {
-                Log("Wumpus killed!");
-                kb.Tell($"NoWumpus({target.Item1},{target.Item2})");
-            }
+    hasArrow = false;
+    score -= 100;
+    Log("Arrow shot!");
+
+    (int, int) target = GetTargetCell();
+    if (world.GetCell(target.Item1, target.Item2).Contains("Wumpus"))
+    {
+        Log("Wumpus killed!");
+        kb.Tell($"NoWumpus({target.Item1},{target.Item2})");
+        kb.Tell($"DeadWumpus({target.Item1},{target.Item2})");
+        // Remove stench from adjacent cells
+        foreach (var cell in GetAdjacentCells(target))
+        {
+            kb.Tell($"NoStench({cell.Item1},{cell.Item2})");
+        }
+    }
+    else
+    {
+        Log("Arrow missed the Wumpus!");
+    }
         }
 
         private (int, int) GetTargetCell()
@@ -750,7 +758,8 @@ private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
         }
 
         private void Move((int, int) nextPosition)
-        {UpdateFacing(nextPosition);
+        {
+             UpdateFacing(nextPosition);
     world.AgentPosition = nextPosition;
     score -= 1; // Cost of moving
     visitedCells.Add(nextPosition);
@@ -760,16 +769,7 @@ private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
     kb.Tell($"NoPit({nextPosition.Item1},{nextPosition.Item2})");
     kb.Tell($"NoWumpus({nextPosition.Item1},{nextPosition.Item2})");
 
-    var dangers = world.GetCell(nextPosition.Item1, nextPosition.Item2)
-        .Where(p => p == "Pit" || p == "Wumpus")
-        .ToList();
-
-    if (dangers.Any())
-    {
-        isAlive = false;
-        score -= 1000;  // Penalty for dying
-        Log($"Agent died! Stepped into a {dangers.First()}");
-    }
+    PerceiveEnvironment();
         }
 
         private void UpdateFacing((int, int) nextPosition)
@@ -787,13 +787,19 @@ private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
             return ManhattanDistance(position, world.AgentPosition);
         }
 
-        private void Log(string message)
-        {
-           if (isAlive)
+       private int turnCount = 0;
+
+private void Log(string message, bool incrementTurn = true)
+{
+    if (isAlive)
     {
-        actionLog.Add($"[Turn {actionLog.Count + 1}] {message}");
-    }
+        if (incrementTurn)
+        {
+            turnCount++;
         }
+        actionLog.Add($"[Turn {turnCount}] {message}");
+    }
+}
 
         private void PrintActionLog()
         {
@@ -836,80 +842,85 @@ private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
         }
 
         private bool InferFact(string query)
-{
-     if (query.StartsWith("NoPit"))
+        {
+            if (query.StartsWith("NoPit"))
+            {
+                var (x, y) = ParseCoordinates(query);
+                return !facts.Contains($"Pit({x},{y})");
+            }
+            if (query.StartsWith("DeadWumpus"))
     {
         var (x, y) = ParseCoordinates(query);
-        return !facts.Contains($"Pit({x},{y})");
+        return facts.Contains($"DeadWumpus({x},{y})");
     }
 
-    if (query.StartsWith("NoWumpus"))
-    {
-        var (x, y) = ParseCoordinates(query);
-        return !facts.Contains($"Wumpus({x},{y})");
-    }
-    if (query.StartsWith("PossiblePit"))
-    {
-        var (x, y) = ParseCoordinates(query);
-        return facts.Contains($"PossiblePit({x},{y})");
-    }
+            if (query.StartsWith("NoWumpus"))
+            {
+                var (x, y) = ParseCoordinates(query);
+                return !facts.Contains($"Wumpus({x},{y})");
+            }
+            if (query.StartsWith("PossiblePit"))
+            {
+                var (x, y) = ParseCoordinates(query);
+                return facts.Contains($"PossiblePit({x},{y})");
+            }
 
-    if (query.StartsWith("PossibleWumpus"))
-    {
-        var (x, y) = ParseCoordinates(query);
-        return facts.Contains($"PossibleWumpus({x},{y})");
-    }
+            if (query.StartsWith("PossibleWumpus"))
+            {
+                var (x, y) = ParseCoordinates(query);
+                return facts.Contains($"PossibleWumpus({x},{y})");
+            }
 
-    if (query.StartsWith("Stench"))
-    {
-        var (x, y) = ParseCoordinates(query);
-        return facts.Contains($"Stench({x},{y})");
-    }
+            if (query.StartsWith("Stench"))
+            {
+                var (x, y) = ParseCoordinates(query);
+                return facts.Contains($"Stench({x},{y})");
+            }
 
-    if (query.StartsWith("Breeze"))
-    {
-        var (x, y) = ParseCoordinates(query);
-        return facts.Contains($"Breeze({x},{y})");
-    }
+            if (query.StartsWith("Breeze"))
+            {
+                var (x, y) = ParseCoordinates(query);
+                return facts.Contains($"Breeze({x},{y})");
+            }
 
-    if (query.StartsWith("Safe"))
-    {
-        var (x, y) = ParseCoordinates(query);
-        return !facts.Contains($"Pit({x},{y})") && !facts.Contains($"Wumpus({x},{y})");
-    }
+            if (query.StartsWith("Safe"))
+            {
+                var (x, y) = ParseCoordinates(query);
+                return !facts.Contains($"Pit({x},{y})") && !facts.Contains($"Wumpus({x},{y})");
+            }
 
-    if (query.StartsWith("Pit"))
-    {
-        var (x, y) = ParseCoordinates(query);
-        return facts.Contains($"Pit({x},{y})");
-    }
+            if (query.StartsWith("Pit"))
+            {
+                var (x, y) = ParseCoordinates(query);
+                return facts.Contains($"Pit({x},{y})");
+            }
 
-    if (query.StartsWith("Wumpus"))
-    {
-        var (x, y) = ParseCoordinates(query);
-        return facts.Contains($"Wumpus({x},{y})");
-    }
+            if (query.StartsWith("Wumpus"))
+            {
+                var (x, y) = ParseCoordinates(query);
+                return facts.Contains($"Wumpus({x},{y})");
+            }
 
-    if (query.StartsWith("Gold"))
-    {
-        var (x, y) = ParseCoordinates(query);
-        return facts.Contains($"Gold({x},{y})");
-    }
+            if (query.StartsWith("Gold"))
+            {
+                var (x, y) = ParseCoordinates(query);
+                return facts.Contains($"Gold({x},{y})");
+            }
 
-    if (query.StartsWith("GoldCollected"))
-    {
-        var (x, y) = ParseCoordinates(query);
-        return facts.Contains($"GoldCollected({x},{y})");
-    }
+            if (query.StartsWith("GoldCollected"))
+            {
+                var (x, y) = ParseCoordinates(query);
+                return facts.Contains($"GoldCollected({x},{y})");
+            }
 
-    if (query.StartsWith("Visited"))
-    {
-        var (x, y) = ParseCoordinates(query);
-        return facts.Contains($"Visited({x},{y})");
-    }
+            if (query.StartsWith("Visited"))
+            {
+                var (x, y) = ParseCoordinates(query);
+                return facts.Contains($"Visited({x},{y})");
+            }
 
-    return false;
-}
+            return false;
+        }
 
         private (int x, int y) ParseCoordinates(string fact)
         {

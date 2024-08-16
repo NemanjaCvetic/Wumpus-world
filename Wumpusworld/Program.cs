@@ -379,7 +379,7 @@ Wxy  = There's the Wumpus on the field (x,y)
             LogDebug($"  PossiblePit: {kb.Ask($"PossiblePit({x},{y}")}");
             //LogDebug($"  Visited: {!kb.Ask($"Visited({x},{y}")}");
            // LogDebug($"  NoPit: {kb.Ask($"NoPit({x},{y}")}");
-                    if (kb.Ask($"PossiblePit({x},{y})") && !kb.Ask($"Visited({x},{y})") )  //&& !kb.Ask($"NoPit({x},{y})")
+                    if (kb.Ask($"PossiblePit({x},{y})")  )  //&& !kb.Ask($"Visited({x},{y})")
                     {
                         LogDebug($"  Deducing pit for ({x},{y})");
                         var adjacentCells = GetAdjacentCells((x, y));
@@ -404,14 +404,14 @@ Wxy  = There's the Wumpus on the field (x,y)
                             Log($"Deduced that there is no Pit on field ({x},{y})");
                         }
 
-                        else if (IsOnEdge(world.AgentPosition))
+              /*         else if (IsOnEdge(world.AgentPosition))
                 {
                     var pitCell = GetPitPositionFromBreeze(world.AgentPosition);
                     kb.Tell($"Pit({pitCell.Item1},{pitCell.Item2})");
                     Log($"Deduced that the Pit is on field ({pitCell.Item1},{pitCell.Item2})");
                 }
 
-                        
+                 */       
                     }
                     else
             {

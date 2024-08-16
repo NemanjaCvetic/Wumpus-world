@@ -374,8 +374,14 @@ Wxy  = There's the Wumpus on the field (x,y)
             {
                 for (int y = 1; y <= world.Height; y++)
                 {
-                    if (kb.Ask($"PossiblePit({x},{y})") && !kb.Ask($"Visited({x},{y})" ) && !kb.Ask($"NoPit({x},{y})") )  //&& !kb.Ask($"NoPit({x},{y})")
+                   
+                    LogDebug($"Checking pit deduction for ({x},{y}):");
+            LogDebug($"  PossiblePit: {kb.Ask($"PossiblePit({x},{y}")}");
+            LogDebug($"  Visited: {kb.Ask($"Visited({x},{y}")}");
+           // LogDebug($"  NoPit: {kb.Ask($"NoPit({x},{y}")}");
+                    if (kb.Ask($"PossiblePit({x},{y})"))  //&& !kb.Ask($"NoPit({x},{y})")
                     {
+                        LogDebug($"  Deducing pit for ({x},{y})");
                         var adjacentCells = GetAdjacentCells((x, y));
                         var breezyAdjacentCells = adjacentCells.Where(cell =>
                             kb.Ask($"Visited({cell.Item1},{cell.Item2})") &&
@@ -387,7 +393,7 @@ Wxy  = There's the Wumpus on the field (x,y)
                             !kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
                         ).ToList();
 
-                        if (breezyAdjacentCells.Count > 0 && nonBreezyAdjacentCells.Count == 0)
+                        if (breezyAdjacentCells.Count > 1 && nonBreezyAdjacentCells.Count == 0)
                         {
                             kb.Tell($"Pit({x},{y})");
                             Log($"Deduced that there is a Pit on field ({x},{y})");
@@ -400,6 +406,10 @@ Wxy  = There's the Wumpus on the field (x,y)
 
                         
                     }
+                    else
+            {
+                LogDebug($"  Skipping pit deduction for ({x},{y})");
+            }
                 }
             }
         }
@@ -635,6 +645,8 @@ Wxy  = There's the Wumpus on the field (x,y)
             while (frontier.Count > 0)
             {
                 var current = frontier.Dequeue();
+                LogDebug($"AStar processing cell: {current}");
+
 
                 if (current == goal)
                 {
@@ -643,7 +655,11 @@ Wxy  = There's the Wumpus on the field (x,y)
 
                 foreach (var next in GetAdjacentCells(current))
                 {
+                   
+                    LogDebug($"  Considering adjacent cell: {next}");
+
                     int newCost = costSoFar[current] + 1;
+                   
                     if ((!costSoFar.ContainsKey(next) || newCost < costSoFar[next]) && IsSafe(next))
                     {
                         costSoFar[next] = newCost;

@@ -275,13 +275,13 @@ Wxy  = There's the Wumpus on the field (x,y)
         private void PerceiveEnvironment()
         {
             var perceptions = world.GetCell(world.AgentPosition.Item1, world.AgentPosition.Item2);
-             LogDebug($"Perceiving environment at {world.AgentPosition}");
+            LogDebug($"Perceiving environment at {world.AgentPosition}");
             bool breezeDetected = false;
             bool stenchDetected = false;
 
             foreach (var perception in perceptions)
             {
-                 LogDebug($"  Perceived: {perception}");
+                LogDebug($"  Perceived: {perception}");
                 HandlePerception(perception);
                 if (perception == "Breeze") breezeDetected = true;
                 if (perception == "Smell") stenchDetected = true;
@@ -374,7 +374,7 @@ Wxy  = There's the Wumpus on the field (x,y)
             {
                 for (int y = 1; y <= world.Height; y++)
                 {
-                    if (kb.Ask($"PossiblePit({x},{y})") && !kb.Ask($"Visited({x},{y})") && !kb.Ask($"NoPit({x},{y})"))
+                    if (kb.Ask($"PossiblePit({x},{y})") && !kb.Ask($"Visited({x},{y})" ) && !kb.Ask($"NoPit({x},{y})") )  //&& !kb.Ask($"NoPit({x},{y})")
                     {
                         var adjacentCells = GetAdjacentCells((x, y));
                         var breezyAdjacentCells = adjacentCells.Where(cell =>
@@ -397,15 +397,17 @@ Wxy  = There's the Wumpus on the field (x,y)
                             kb.Tell($"NoPit({x},{y})");
                             Log($"Deduced that there is no Pit on field ({x},{y})");
                         }
+
+                        
                     }
                 }
             }
         }
 
         private void LogDebug(string message)
-{
-    Console.WriteLine($"[DEBUG] Turn {turnCount}: {message}");
-}
+        {
+            Console.WriteLine($"[DEBUG] Turn {turnCount}: {message}");
+        }
 
         private void DeducePitFromCurrentKnowledge()
         {
@@ -505,17 +507,17 @@ Wxy  = There's the Wumpus on the field (x,y)
             LogDebug("Planning next move");
             if (plannedPath.Count == 0)
             {
-                 LogDebug("No planned path, generating new path");
+                LogDebug("No planned path, generating new path");
                 plannedPath = PlanPath();
             }
 
             if (plannedPath.Count > 0)
             {
                 var nextMove = plannedPath.Peek();
-                 LogDebug($"Next planned move: {nextMove}");
+                LogDebug($"Next planned move: {nextMove}");
                 if (nextMove == world.AgentPosition)
                 {
-                     LogDebug("Next move is current position, removing from path");
+                    LogDebug("Next move is current position, removing from path");
                     plannedPath.Dequeue(); // Remove the current position from the path
                     return PlanNextMove(); // Recursively plan the next move
                 }
@@ -541,7 +543,7 @@ Wxy  = There's the Wumpus on the field (x,y)
                     return plannedPath.Dequeue();
                 }
             }
- LogDebug("No planned path, getting safest move");
+            LogDebug("No planned path, getting safest move");
             return GetSafestMove();
         }
 
@@ -712,11 +714,14 @@ Wxy  = There's the Wumpus on the field (x,y)
 
         private bool IsSafe((int, int) cell)
         {
-            
-            bool safe = !kb.Ask($"Pit({cell.Item1},{cell.Item2})") || kb.Ask($"NoPit({cell.Item1},{cell.Item2})")
-                  && !kb.Ask($"Wumpus({cell.Item1},{cell.Item2})");
-LogDebug($"IsSafe check for {cell}: {safe}");
-                  return safe;
+
+            bool safe = !kb.Ask($"Pit({cell.Item1},{cell.Item2})") ||
+                         kb.Ask($"NoPit({cell.Item1},{cell.Item2})") &&
+                         !kb.Ask($"PossiblePit({cell.Item1},{cell.Item2})") &&
+                        !kb.Ask($"Wumpus({cell.Item1},{cell.Item2})") &&
+                         !kb.Ask($"PossibleWumpus({cell.Item1},{cell.Item2})");
+            LogDebug($"IsSafe check for {cell}: {safe}");
+            return safe;
         }
 
         private List<(int, int)> GetAdjacentCells((int, int) cell)
@@ -774,30 +779,30 @@ LogDebug($"IsSafe check for {cell}: {safe}");
         private void Move((int, int) nextPosition)
         {
             LogDebug($"Considering move to {nextPosition}");
-    LogDebug($"Current KB state for {nextPosition}:");
-    LogDebug($"  IsSafe: {IsSafe(nextPosition)}");
-    LogDebug($"  Pit: {kb.Ask($"Pit({nextPosition.Item1},{nextPosition.Item2}")}");
-    LogDebug($"  PossiblePit: {kb.Ask($"PossiblePit({nextPosition.Item1},{nextPosition.Item2}")}");
-    LogDebug($"  Wumpus: {kb.Ask($"Wumpus({nextPosition.Item1},{nextPosition.Item2}")}");
-    LogDebug($"  PossibleWumpus: {kb.Ask($"PossibleWumpus({nextPosition.Item1},{nextPosition.Item2}")}");
+            LogDebug($"Current KB state for {nextPosition}:");
+            LogDebug($"  IsSafe: {IsSafe(nextPosition)}");
+            LogDebug($"  Pit: {kb.Ask($"Pit({nextPosition.Item1},{nextPosition.Item2}")}");
+            LogDebug($"  PossiblePit: {kb.Ask($"PossiblePit({nextPosition.Item1},{nextPosition.Item2}")}");
+            LogDebug($"  Wumpus: {kb.Ask($"Wumpus({nextPosition.Item1},{nextPosition.Item2}")}");
+            LogDebug($"  PossibleWumpus: {kb.Ask($"PossibleWumpus({nextPosition.Item1},{nextPosition.Item2}")}");
 
-    if (!IsSafe(nextPosition))
-    {
-        LogDebug($"Aborting move to {nextPosition} as it's not safe!");
-        return;
-    }
+            if (!IsSafe(nextPosition))
+            {
+                LogDebug($"Aborting move to {nextPosition} as it's not safe!");
+                return;
+            }
 
-    UpdateFacing(nextPosition);
-    world.AgentPosition = nextPosition;
-    score -= 1; // Cost of moving
-    visitedCells.Add(nextPosition);
-    Log($"Moved to {nextPosition}");
+            UpdateFacing(nextPosition);
+            world.AgentPosition = nextPosition;
+            score -= 1; // Cost of moving
+            visitedCells.Add(nextPosition);
+            Log($"Moved to {nextPosition}");
 
-    kb.Tell($"Visited({nextPosition.Item1},{nextPosition.Item2})");
-    kb.Tell($"NoPit({nextPosition.Item1},{nextPosition.Item2})");
-    kb.Tell($"NoWumpus({nextPosition.Item1},{nextPosition.Item2})");
+            kb.Tell($"Visited({nextPosition.Item1},{nextPosition.Item2})");
+            kb.Tell($"NoPit({nextPosition.Item1},{nextPosition.Item2})");
+            kb.Tell($"NoWumpus({nextPosition.Item1},{nextPosition.Item2})");
 
-    PerceiveEnvironment();
+            PerceiveEnvironment();
         }
 
         private void UpdateFacing((int, int) nextPosition)

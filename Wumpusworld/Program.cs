@@ -377,9 +377,9 @@ Wxy  = There's the Wumpus on the field (x,y)
                    
                     LogDebug($"Checking pit deduction for ({x},{y}):");
             LogDebug($"  PossiblePit: {kb.Ask($"PossiblePit({x},{y}")}");
-            LogDebug($"  Visited: {kb.Ask($"Visited({x},{y}")}");
+            //LogDebug($"  Visited: {!kb.Ask($"Visited({x},{y}")}");
            // LogDebug($"  NoPit: {kb.Ask($"NoPit({x},{y}")}");
-                    if (kb.Ask($"PossiblePit({x},{y})"))  //&& !kb.Ask($"NoPit({x},{y})")
+                    if (kb.Ask($"PossiblePit({x},{y})") && !kb.Ask($"Visited({x},{y})") )  //&& !kb.Ask($"NoPit({x},{y})")
                     {
                         LogDebug($"  Deducing pit for ({x},{y})");
                         var adjacentCells = GetAdjacentCells((x, y));
@@ -404,6 +404,13 @@ Wxy  = There's the Wumpus on the field (x,y)
                             Log($"Deduced that there is no Pit on field ({x},{y})");
                         }
 
+                        else if (IsOnEdge(world.AgentPosition))
+                {
+                    var pitCell = GetPitPositionFromBreeze(world.AgentPosition);
+                    kb.Tell($"Pit({pitCell.Item1},{pitCell.Item2})");
+                    Log($"Deduced that the Pit is on field ({pitCell.Item1},{pitCell.Item2})");
+                }
+
                         
                     }
                     else
@@ -414,48 +421,7 @@ Wxy  = There's the Wumpus on the field (x,y)
             }
         }
 
-        private void LogDebug(string message)
-        {
-            Console.WriteLine($"[DEBUG] Turn {turnCount}: {message}");
-        }
-
-        private void DeducePitFromCurrentKnowledge()
-        {
-            for (int x = 1; x <= world.Width; x++)
-            {
-                for (int y = 1; y <= world.Height; y++)
-                {
-                    if (kb.Ask($"PossiblePit({x},{y})") && !kb.Ask($"Visited({x},{y})"))
-                    {
-                        var adjacentCells = GetAdjacentCells((x, y));
-                        var breezyAdjacentCells = adjacentCells.Where(cell =>
-                            kb.Ask($"Visited({cell.Item1},{cell.Item2})") &&
-                            kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
-                        ).ToList();
-
-                        var nonBreezyAdjacentCells = adjacentCells.Where(cell =>
-                            kb.Ask($"Visited({cell.Item1},{cell.Item2})") &&
-                            !kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
-                        ).ToList();
-
-                        if (breezyAdjacentCells.Count > 0 && nonBreezyAdjacentCells.Count == 0)
-                        {
-                            kb.Tell($"Pit({x},{y})");
-                            Log($"Deduced that there is a Pit on field ({x},{y})");
-                        }
-                        else if (nonBreezyAdjacentCells.Count > 0)
-                        {
-                            kb.Tell($"NoPit({x},{y})");
-                            Log($"Deduced that there is no Pit on field ({x},{y})");
-                        }
-                    }
-                }
-            }
-        }
-
-
-
-        private (int, int) GetPitPositionFromBreeze((int, int) agentPosition)
+         private (int, int) GetPitPositionFromBreeze((int, int) agentPosition)
         {
             if (agentPosition.Item1 == 1)
                 return (1, agentPosition.Item2 + 1);
@@ -466,6 +432,17 @@ Wxy  = There's the Wumpus on the field (x,y)
             else // agentPosition.Item2 == world.Height
                 return (agentPosition.Item1, world.Height - 1);
         }
+
+        private void LogDebug(string message)
+        {
+            Console.WriteLine($"[DEBUG] Turn {turnCount}: {message}");
+        }
+
+       
+
+
+
+       
 
 
         private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
@@ -818,6 +795,8 @@ Wxy  = There's the Wumpus on the field (x,y)
             kb.Tell($"NoPit({nextPosition.Item1},{nextPosition.Item2})");
             kb.Tell($"NoWumpus({nextPosition.Item1},{nextPosition.Item2})");
 
+          
+
             PerceiveEnvironment();
         }
 
@@ -888,6 +867,11 @@ Wxy  = There's the Wumpus on the field (x,y)
         public bool Ask(string query)
         {
             return InferFact(query);
+        }
+
+        public void Remove(string query)
+        {
+            facts.Remove(query);
         }
 
         private bool InferFact(string query)

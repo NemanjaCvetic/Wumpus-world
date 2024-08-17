@@ -374,6 +374,10 @@ Wxy  = There's the Wumpus on the field (x,y)
             {
                 for (int y = 1; y <= world.Height; y++)
                 {
+                     if (kb.IsSafe(x, y))
+            {
+                continue; // Skip known safe squares
+            }
 
                     LogDebug($"Checking pit deduction for ({x},{y}):");
                     LogDebug($"  PossiblePit: {kb.Ask($"PossiblePit({x},{y}")}");
@@ -583,7 +587,7 @@ Wxy  = There's the Wumpus on the field (x,y)
             {
                 for (int y = 1; y <= world.Height; y++)
                 {
-                    if (!visitedCells.Contains((x, y)) && IsSafe((x, y)))
+                    if (!kb.Ask($"Visited({x},{y})") && (kb.IsSafe(x, y) || IsSafe((x, y))))
                     {
                         cells.Add((x, y));
                     }
@@ -630,19 +634,23 @@ Wxy  = There's the Wumpus on the field (x,y)
                     break;
                 }
 
-                foreach (var next in GetAdjacentCells(current))
+                foreach (var next in GetAdjacentCells(current).OrderByDescending(cell => kb.IsSafe(cell.Item1, cell.Item2)))
                 {
 
-                    LogDebug($"  Considering adjacent cell: {next}");
-
-                    int newCost = costSoFar[current] + 1;
-
-                    if ((!costSoFar.ContainsKey(next) || newCost < costSoFar[next]) && IsSafe(next))
+                    if (kb.IsSafe(next.Item1, next.Item2) || IsSafe(next))
                     {
-                        costSoFar[next] = newCost;
-                        int priority = newCost + ManhattanDistance(next, goal);
-                        frontier.Enqueue(next, priority);
-                        cameFrom[next] = current;
+
+                        LogDebug($"  Considering adjacent cell: {next}");
+
+                        int newCost = costSoFar[current] + 1;
+
+                        if ((!costSoFar.ContainsKey(next) || newCost < costSoFar[next]) && IsSafe(next))
+                        {
+                            costSoFar[next] = newCost;
+                            int priority = newCost + ManhattanDistance(next, goal);
+                            frontier.Enqueue(next, priority);
+                            cameFrom[next] = current;
+                        }
                     }
                 }
             }
@@ -700,13 +708,19 @@ Wxy  = There's the Wumpus on the field (x,y)
         private int DangerLevel((int, int) cell)
         {
             int danger = 0;
-            if (kb.Ask($"Pit({cell.Item1},{cell.Item2})")) danger += 10;
+            if (kb.Ask($"Pit({cell.Item1},{cell.Item2})")) danger += 50;
+            if (kb.Ask($"PossiblePit({cell.Item1},{cell.Item2})")) danger += 10;
             if (kb.Ask($"Wumpus({cell.Item1},{cell.Item2})")) danger += 100;
             return danger;
         }
 
         private bool IsSafe((int, int) cell)
         {
+
+            if (kb.IsSafe(cell.Item1, cell.Item2))
+            {
+                return true;
+            }
 
             bool safe = !kb.Ask($"Pit({cell.Item1},{cell.Item2})") ||
                          kb.Ask($"NoPit({cell.Item1},{cell.Item2})") &&
@@ -792,6 +806,7 @@ Wxy  = There's the Wumpus on the field (x,y)
             Log($"Moved to {nextPosition}");
 
             kb.Tell($"Visited({nextPosition.Item1},{nextPosition.Item2})");
+            kb.MarkSafe(nextPosition.Item1, nextPosition.Item2);
             kb.Tell($"NoPit({nextPosition.Item1},{nextPosition.Item2})");
             kb.Tell($"NoWumpus({nextPosition.Item1},{nextPosition.Item2})");
 
@@ -853,10 +868,12 @@ Wxy  = There's the Wumpus on the field (x,y)
     class KnowledgeBase
     {
         private HashSet<string> facts;
+        private HashSet<(int, int)> safeSquares;
 
         public KnowledgeBase()
         {
             facts = new HashSet<string>();
+            safeSquares = new HashSet<(int, int)>();
             InitializeKB();
         }
 
@@ -883,6 +900,16 @@ Wxy  = There's the Wumpus on the field (x,y)
         public void Remove(string query)
         {
             facts.Remove(query);
+        }
+
+        public void MarkSafe(int x, int y)
+        {
+            safeSquares.Add((x, y));
+        }
+
+        public bool IsSafe(int x, int y)
+        {
+            return safeSquares.Contains((x, y));
         }
 
         private bool InferFact(string query)

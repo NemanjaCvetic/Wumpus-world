@@ -374,12 +374,12 @@ Wxy  = There's the Wumpus on the field (x,y)
             {
                 for (int y = 1; y <= world.Height; y++)
                 {
-                   
+
                     LogDebug($"Checking pit deduction for ({x},{y}):");
-            LogDebug($"  PossiblePit: {kb.Ask($"PossiblePit({x},{y}")}");
-            //LogDebug($"  Visited: {!kb.Ask($"Visited({x},{y}")}");
-           // LogDebug($"  NoPit: {kb.Ask($"NoPit({x},{y}")}");
-                    if (kb.Ask($"PossiblePit({x},{y})")  )  //&& !kb.Ask($"Visited({x},{y})")
+                    LogDebug($"  PossiblePit: {kb.Ask($"PossiblePit({x},{y}")}");
+                    //LogDebug($"  Visited: {!kb.Ask($"Visited({x},{y}")}");
+                    // LogDebug($"  NoPit: {kb.Ask($"NoPit({x},{y}")}");
+                    if (kb.Ask($"PossiblePit({x},{y})"))  //&& !kb.Ask($"Visited({x},{y})")
                     {
                         LogDebug($"  Deducing pit for ({x},{y})");
                         var adjacentCells = GetAdjacentCells((x, y));
@@ -404,24 +404,24 @@ Wxy  = There's the Wumpus on the field (x,y)
                             Log($"Deduced that there is no Pit on field ({x},{y})");
                         }
 
-              /*         else if (IsOnEdge(world.AgentPosition))
-                {
-                    var pitCell = GetPitPositionFromBreeze(world.AgentPosition);
-                    kb.Tell($"Pit({pitCell.Item1},{pitCell.Item2})");
-                    Log($"Deduced that the Pit is on field ({pitCell.Item1},{pitCell.Item2})");
-                }
+                        /*         else if (IsOnEdge(world.AgentPosition))
+                          {
+                              var pitCell = GetPitPositionFromBreeze(world.AgentPosition);
+                              kb.Tell($"Pit({pitCell.Item1},{pitCell.Item2})");
+                              Log($"Deduced that the Pit is on field ({pitCell.Item1},{pitCell.Item2})");
+                          }
 
-                 */       
+                           */
                     }
                     else
-            {
-                LogDebug($"  Skipping pit deduction for ({x},{y})");
-            }
+                    {
+                        LogDebug($"  Skipping pit deduction for ({x},{y})");
+                    }
                 }
             }
         }
 
-         private (int, int) GetPitPositionFromBreeze((int, int) agentPosition)
+        private (int, int) GetPitPositionFromBreeze((int, int) agentPosition)
         {
             if (agentPosition.Item1 == 1)
                 return (1, agentPosition.Item2 + 1);
@@ -438,11 +438,11 @@ Wxy  = There's the Wumpus on the field (x,y)
             Console.WriteLine($"[DEBUG] Turn {turnCount}: {message}");
         }
 
-       
 
 
 
-       
+
+
 
 
         private (int, int) GetWumpusPositionFromStench((int, int) agentPosition)
@@ -632,11 +632,11 @@ Wxy  = There's the Wumpus on the field (x,y)
 
                 foreach (var next in GetAdjacentCells(current))
                 {
-                   
+
                     LogDebug($"  Considering adjacent cell: {next}");
 
                     int newCost = costSoFar[current] + 1;
-                   
+
                     if ((!costSoFar.ContainsKey(next) || newCost < costSoFar[next]) && IsSafe(next))
                     {
                         costSoFar[next] = newCost;
@@ -795,14 +795,25 @@ Wxy  = There's the Wumpus on the field (x,y)
             kb.Tell($"NoPit({nextPosition.Item1},{nextPosition.Item2})");
             kb.Tell($"NoWumpus({nextPosition.Item1},{nextPosition.Item2})");
 
-          
+
 
             PerceiveEnvironment();
         }
 
         private void UpdateFacing((int, int) nextPosition)
         {
-            // ... (existing implementation)
+            int dx = nextPosition.Item1 - world.AgentPosition.Item1;
+            int dy = nextPosition.Item2 - world.AgentPosition.Item2;
+
+            if (dx > 0)
+                facing = Direction.Right;
+            else if (dx < 0)
+                facing = Direction.Left;
+            else if (dy > 0)
+                facing = Direction.Up;
+            else if (dy < 0)
+                facing = Direction.Down;
+            // If dx and dy are both 0, we don't change the facing direction
         }
 
         private int DistanceToGoal((int, int) position)

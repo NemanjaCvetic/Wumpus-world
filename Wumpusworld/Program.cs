@@ -439,7 +439,7 @@ Wxy  = There's the Wumpus on the field (x,y)
                             kb.Tell($"NoPit({x},{y})");
                             kb.MarkSafe(x, y);
                         }
-                        else if (breezyAdjacentCells.Count > 0 && nonBreezyAdjacentCells.Count == 0)
+                        else if (breezyAdjacentCells.Count > 0)
                         {
                             kb.Tell($"PossiblePit({x},{y})");
                         }

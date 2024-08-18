@@ -101,6 +101,7 @@ Wxy  = There's the Wumpus on the field (x,y)
     {
 
         Console.WriteLine("Welcome to the Wumpus World!");
+        KnowledgeBase kb = new KnowledgeBase();
 
         while (true)
         {
@@ -113,12 +114,24 @@ Wxy  = There's the Wumpus on the field (x,y)
             try
             {
                 WumpusWorld world = new WumpusWorld(filename);
-                Agent agent = new Agent(world);
+                 bool gameCompleted = false;
+                while (!gameCompleted)
+                {
+                    Agent agent = new Agent(world, kb);
+                    Console.WriteLine($"Starting a new attempt in the world from {filename}...");
+                    agent.Play();
 
-                Console.WriteLine($"Starting the game with world from {filename}...");
-                agent.Play();
-
-                Console.WriteLine("Game over!");
+                    if (agent.ReachedGoal)
+                    {
+                        gameCompleted = true;
+                        Console.WriteLine("Game completed successfully!");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Agent died. Restarting from the beginning...");
+                        world.ResetAgentPosition();
+                    }
+                }
             }
             catch (Exception e)
             {
@@ -144,10 +157,13 @@ Wxy  = There's the Wumpus on the field (x,y)
         public (int, int) AgentPosition { get; set; }
         public (int, int) GoalPosition { get; private set; }
 
+         public (int, int) InitialAgentPosition { get; private set; }
+
         public WumpusWorld(string filename)
         {
             world = new Dictionary<(int, int), List<string>>();
             ParseWorldFile(filename);
+             InitialAgentPosition = AgentPosition;
         }
 
         private void ParseWorldFile(string filename)
@@ -191,6 +207,7 @@ Wxy  = There's the Wumpus on the field (x,y)
                 {
                     case 'A':
                         AgentPosition = (x, y);
+                        InitialAgentPosition = (x, y);
                         break;
                     case 'M':
                         Width = x;
@@ -218,6 +235,11 @@ Wxy  = There's the Wumpus on the field (x,y)
             }
         }
 
+       public void ResetAgentPosition()
+    {
+        AgentPosition = InitialAgentPosition;
+    }
+
         public List<string> GetCell(int x, int y)
         {
             if (world.TryGetValue((x, y), out var cellContents))
@@ -240,10 +262,13 @@ Wxy  = There's the Wumpus on the field (x,y)
         private bool isAlive;
         private Queue<(int, int)> plannedPath;
 
-        public Agent(WumpusWorld world)
+
+        public bool ReachedGoal { get; private set; }
+
+        public Agent(WumpusWorld world, KnowledgeBase kb)
         {
             this.world = world;
-            this.kb = new KnowledgeBase();
+            this.kb = kb;
             this.visitedCells = new List<(int, int)>();
             this.facing = Direction.Right;
             this.score = 0;
@@ -251,6 +276,7 @@ Wxy  = There's the Wumpus on the field (x,y)
             this.actionLog = new List<string>();
             this.isAlive = true;
             this.plannedPath = new Queue<(int, int)>();
+            this.ReachedGoal = false;
         }
 
         public void Play()
@@ -260,10 +286,15 @@ Wxy  = There's the Wumpus on the field (x,y)
                 (int, int) nextMove = PlanNextMove();
                 Move(nextMove);
 
-                if (!isAlive) break;
+                 if (!isAlive)
+            {
+                LearnFromDeath();
+                break;
+            }
 
                 if (world.AgentPosition == world.GoalPosition)
                 {
+                    ReachedGoal = true;
                     Log($"Reached the goal! Final score: {score}");
                     break;
                 }
@@ -271,6 +302,12 @@ Wxy  = There's the Wumpus on the field (x,y)
 
             PrintActionLog();
         }
+
+        private void LearnFromDeath()
+    {
+        kb.Tell($"Pit({world.AgentPosition.Item1},{world.AgentPosition.Item2})");
+        Log($"Learned that there is a pit at {world.AgentPosition}");
+    }
 
         private void PerceiveEnvironment()
         {
@@ -374,16 +411,16 @@ Wxy  = There's the Wumpus on the field (x,y)
             {
                 for (int y = 1; y <= world.Height; y++)
                 {
-                     if (kb.IsSafe(x, y))
-            {
-                continue; // Skip known safe squares
-            }
+                    if (kb.IsSafe(x, y))
+                    {
+                        continue; // Skip known safe squares
+                    }
 
                     LogDebug($"Checking pit deduction for ({x},{y}):");
                     LogDebug($"  PossiblePit: {kb.Ask($"PossiblePit({x},{y}")}");
                     //LogDebug($"  Visited: {!kb.Ask($"Visited({x},{y}")}");
                     // LogDebug($"  NoPit: {kb.Ask($"NoPit({x},{y}")}");
-                    if (kb.Ask($"PossiblePit({x},{y})"))  //&& !kb.Ask($"Visited({x},{y})")
+                    if (!kb.IsVisited(x, y) && !kb.Ask($"NoPit({x},{y})"))  //&& !kb.Ask($"Visited({x},{y})")
                     {
                         LogDebug($"  Deducing pit for ({x},{y})");
                         var adjacentCells = GetAdjacentCells((x, y));
@@ -393,19 +430,18 @@ Wxy  = There's the Wumpus on the field (x,y)
                         ).ToList();
 
                         var nonBreezyAdjacentCells = adjacentCells.Where(cell =>
-                            kb.Ask($"Visited({cell.Item1},{cell.Item2})") &&
+                           kb.IsVisited(cell.Item1, cell.Item2) &&
                             !kb.Ask($"Breeze({cell.Item1},{cell.Item2})")
                         ).ToList();
 
-                        if (breezyAdjacentCells.Count > 1 && nonBreezyAdjacentCells.Count == 0)
-                        {
-                            kb.Tell($"Pit({x},{y})");
-                            Log($"Deduced that there is a Pit on field ({x},{y})");
-                        }
-                        else if (nonBreezyAdjacentCells.Count > 0)
+                        if (breezyAdjacentCells.Count > 0 && nonBreezyAdjacentCells.Count > 0)
                         {
                             kb.Tell($"NoPit({x},{y})");
-                            Log($"Deduced that there is no Pit on field ({x},{y})");
+                            kb.MarkSafe(x, y);
+                        }
+                        else if (breezyAdjacentCells.Count > 0 && nonBreezyAdjacentCells.Count == 0)
+                        {
+                            kb.Tell($"PossiblePit({x},{y})");
                         }
 
                         /*         else if (IsOnEdge(world.AgentPosition))
@@ -475,6 +511,7 @@ Wxy  = There's the Wumpus on the field (x,y)
                     if (!breezeDetected)
                     {
                         kb.Tell($"NoPit({cell.Item1},{cell.Item2})");
+                        kb.MarkSafe(cell.Item1, cell.Item2);
                     }
                     else
                     {
@@ -484,6 +521,7 @@ Wxy  = There's the Wumpus on the field (x,y)
                     if (!stenchDetected)
                     {
                         kb.Tell($"NoWumpus({cell.Item1},{cell.Item2})");
+                        kb.MarkSafe(cell.Item1, cell.Item2);
                     }
                     else
                     {
@@ -501,6 +539,23 @@ Wxy  = There's the Wumpus on the field (x,y)
                 LogDebug("No planned path, generating new path");
                 plannedPath = PlanPath();
             }
+
+            var adjacentCells = GetAdjacentCells(world.AgentPosition);
+             var safeCells = adjacentCells.Where(cell => 
+            kb.IsSafe(cell.Item1, cell.Item2) && 
+            !kb.Ask($"Pit({cell.Item1},{cell.Item2})") &&
+            !kb.Ask($"Wumpus({cell.Item1},{cell.Item2})")
+        ).ToList();
+            if (safeCells.Any())
+            {
+                return safeCells.OrderBy(DistanceToGoal).First();
+            }
+
+             var unexploredCells = adjacentCells.Where(cell => !kb.IsVisited(cell.Item1, cell.Item2)).ToList();
+        if (unexploredCells.Any())
+        {
+            return unexploredCells.OrderBy(cell => DangerLevel(cell)).First();
+        }
 
             if (plannedPath.Count > 0)
             {
@@ -535,7 +590,7 @@ Wxy  = There's the Wumpus on the field (x,y)
                 }
             }
             LogDebug("No planned path, getting safest move");
-            return GetSafestMove();
+            return adjacentCells.OrderBy(cell => DangerLevel(cell)).First();
         }
 
 
@@ -708,10 +763,11 @@ Wxy  = There's the Wumpus on the field (x,y)
         private int DangerLevel((int, int) cell)
         {
             int danger = 0;
-            if (kb.Ask($"Pit({cell.Item1},{cell.Item2})")) danger += 50;
-            if (kb.Ask($"PossiblePit({cell.Item1},{cell.Item2})")) danger += 10;
-            if (kb.Ask($"Wumpus({cell.Item1},{cell.Item2})")) danger += 100;
-            return danger;
+        if (kb.Ask($"Pit({cell.Item1},{cell.Item2})")) danger += 1000;
+        if (kb.Ask($"PossiblePit({cell.Item1},{cell.Item2})")) danger += 50;
+        if (kb.Ask($"Wumpus({cell.Item1},{cell.Item2})")) danger += 1000;
+        if (kb.Ask($"PossibleWumpus({cell.Item1},{cell.Item2})")) danger += 50;
+        return danger;
         }
 
         private bool IsSafe((int, int) cell)
@@ -802,17 +858,26 @@ Wxy  = There's the Wumpus on the field (x,y)
             UpdateFacing(nextPosition);
             world.AgentPosition = nextPosition;
             score -= 1; // Cost of moving
-            visitedCells.Add(nextPosition);
+            kb.MarkVisited(nextPosition.Item1, nextPosition.Item2);
             Log($"Moved to {nextPosition}");
 
             kb.Tell($"Visited({nextPosition.Item1},{nextPosition.Item2})");
             kb.MarkSafe(nextPosition.Item1, nextPosition.Item2);
             kb.Tell($"NoPit({nextPosition.Item1},{nextPosition.Item2})");
+           
             kb.Tell($"NoWumpus({nextPosition.Item1},{nextPosition.Item2})");
 
-
-
+var cellContents = world.GetCell(nextPosition.Item1, nextPosition.Item2);
+ if (cellContents.Contains("Pit") || cellContents.Contains("Wumpus"))
+        {
+            isAlive = false;
+            score -= 1000;
+            Log($"Agent died at {nextPosition}!");
+        }
+        else
+        {
             PerceiveEnvironment();
+        }
         }
 
         private void UpdateFacing((int, int) nextPosition)
@@ -868,12 +933,13 @@ Wxy  = There's the Wumpus on the field (x,y)
     class KnowledgeBase
     {
         private HashSet<string> facts;
-        private HashSet<(int, int)> safeSquares;
-
+        private HashSet<(int, int)> safeCells;
+        private HashSet<(int, int)> visitedCells;
         public KnowledgeBase()
         {
             facts = new HashSet<string>();
-            safeSquares = new HashSet<(int, int)>();
+            safeCells = new HashSet<(int, int)>();
+            visitedCells = new HashSet<(int, int)>();
             InitializeKB();
         }
 
@@ -904,13 +970,37 @@ Wxy  = There's the Wumpus on the field (x,y)
 
         public void MarkSafe(int x, int y)
         {
-            safeSquares.Add((x, y));
+            safeCells.Add((x, y));
+             Remove($"PossiblePit({x},{y})");
+        Remove($"PossibleWumpus({x},{y})");
         }
 
         public bool IsSafe(int x, int y)
         {
-            return safeSquares.Contains((x, y));
+            return safeCells.Contains((x, y)) && 
+               !Ask($"Pit({x},{y})") && 
+               !Ask($"Wumpus({x},{y})");
         }
+
+        public void MarkVisited(int x, int y)
+        {
+            visitedCells.Add((x, y));
+            MarkSafe(x, y);
+        }
+
+
+        public bool IsVisited(int x, int y)
+        {
+            return visitedCells.Contains((x, y));
+        }
+
+        public void Clear()
+        {
+            facts.Clear();
+            safeCells.Clear();
+            visitedCells.Clear();
+        }
+
 
         private bool InferFact(string query)
         {
